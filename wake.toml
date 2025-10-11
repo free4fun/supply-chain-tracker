@@ -1,0 +1,39 @@
+[compiler.solc]
+# Remappings for a Foundry project (project lives in ./sc)
+remappings = [
+  "forge-std/=sc/lib/forge-std/src/",
+  "ds-test/=sc/lib/forge-std/lib/ds-test/src/"
+]
+
+# Make Wake search these paths for non-relative imports.
+# We include the project `sc` but avoid explicitly including vendor
+# sources (like `sc/lib`) so Wake does not index them. Remappings
+# (above) will still allow resolving imports such as
+# `import "forge-std/Test.sol";` without indexing the whole vendor
+# directory.
+# Only include the project source/test/script folders explicitly so Wake
+# does not recursively index vendor folders under `sc/lib` when you open
+# test files. Remappings still resolve vendor imports.
+include_paths = ["sc/src", "sc/test", "sc/script"]
+
+# Optional: avoid indexing vendor libraries while still allowing
+# remapped imports to resolve. Use glob patterns to exclude the
+# general `lib` folders but keep the specific `forge-std` src via
+# the `include_paths` above.
+exclude_paths = [
+  "node_modules",
+  "venv",
+  ".venv",
+  "sc/script",
+  "test",
+  "lib/**",
+  "sc/lib/",
+  "sc/test/",
+]
+
+# Optional but useful:
+via_IR = true
+
+[compiler.solc.optimizer]
+enabled = true
+runs = 200
