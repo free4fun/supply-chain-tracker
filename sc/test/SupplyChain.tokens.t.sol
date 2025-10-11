@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {SupplyChain} from "../src/SupplyChain.sol";
+import { Test } from "forge-std/Test.sol";
+import { SupplyChain } from "../src/SupplyChain.sol";
 
 contract SupplyChainTokensTest is Test {
     SupplyChain internal sc;
 
     // Test actors
-    address internal admin    = address(this);
+    address internal admin = address(this);
     address internal producer = address(0xA1);
-    address internal factory  = address(0xA2);
+    address internal factory = address(0xA2);
     address internal retailer = address(0xA3);
     address internal consumer = address(0xA4);
 
