@@ -59,11 +59,11 @@ contract SupplyChain {
 
     // Tokens
     uint256 public nextTokenId = 1;
-    mapping(uint256 => Token) private tokens;
+    mapping(uint256 => Token) public tokens;
 
     // Transfers
     uint256 public nextTransferId = 1;
-    mapping(uint256 => Transfer) private transfers;
+    mapping(uint256 => Transfer) public transfers;
     // Reserved amounts while transfers are Pending: tokenId => from => reserved
     mapping(uint256 => mapping(address => uint256)) private reservedPendingOut;
 
