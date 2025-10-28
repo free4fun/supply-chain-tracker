@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useWeb3 } from "@/contexts/Web3Context";
 
 const ANVIL_HEX = "0x7a69"; // 31337
@@ -26,17 +26,25 @@ export default function ChainGuard({ children }: { children: React.ReactNode }) 
     }
   }
 
-  if (!ready) return <div className="p-3 text-sm">Cargando…</div>;
+  if (!ready) return <div className="rounded-3xl border border-slate-200/70 bg-white/80 px-4 py-3 text-sm text-slate-600 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70 dark:text-slate-300">Cargando…</div>;
 
-return (
-  <>
-    {chainId && chainId !== 31337 ? (
-      <div className="p-3 bg-yellow-50 border-b border-yellow-200 text-sm">
-        Red incorrecta. Esperado 31337. <button onClick={switchChain} className="underline">Cambiar a Anvil</button>
-        {msg && <span className="ml-2 text-red-600">{msg}</span>}
-      </div>
-    ) : null}
-    {children}
-  </>
-);
+  return (
+    <>
+      {chainId && chainId !== 31337 ? (
+        <div className="rounded-3xl border border-amber-400/60 bg-amber-100/70 px-4 py-4 text-sm text-amber-900 shadow-[0_18px_45px_-30px_rgba(217,119,6,0.6)] backdrop-blur dark:border-amber-300/50 dark:bg-amber-500/10 dark:text-amber-100">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold">Red incorrecta. Esperado 31337.</span>
+            <button
+              onClick={switchChain}
+              className="rounded-full border border-amber-400/60 px-3 py-1 text-xs font-semibold text-amber-800 transition hover:border-amber-500 hover:text-amber-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:border-amber-300/50 dark:text-amber-100 dark:hover:text-white"
+            >
+              Cambiar a Anvil
+            </button>
+            {msg && <span className="text-xs font-medium text-rose-500 dark:text-rose-300">{msg}</span>}
+          </div>
+        </div>
+      ) : null}
+      {children}
+    </>
+  );
 }

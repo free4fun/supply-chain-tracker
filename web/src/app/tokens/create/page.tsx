@@ -1,10 +1,12 @@
 // web/src/app/tokens/create/page.tsx
 "use client";
 import { useState } from "react";
-import { createToken } from "@/lib/sc";
-import { useToast } from "@/contexts/ToastContext";
 import { z } from "zod";
+
+import { useToast } from "@/contexts/ToastContext";
 import { useWeb3 } from "@/contexts/Web3Context";
+import { useRole } from "@/contexts/RoleContext";
+import { createToken } from "@/lib/sc";
 
 const schema = z.object({
   name: z.string().trim().min(1, "Name required"),
@@ -23,6 +25,9 @@ export default function CreateTokenPage() {
   const [pending, setPending] = useState(false);
   const { push } = useToast();
   const { account } = useWeb3();
+  const { activeRole, isApproved, loading: roleLoading, isAdmin, statusLabel } = useRole();
+
+  const canCreate = Boolean((activeRole && ["Producer", "Factory"].includes(activeRole)) || isAdmin);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,15 +44,33 @@ export default function CreateTokenPage() {
       );
       push("success","Token created");
       setName(""); setSupply("0"); setParentId("0"); // dejamos features como está
-    } catch (e:any) {
-      push("error", e?.message || "Transaction failed");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Transaction failed";
+      push("error", message);
     } finally { setPending(false); }
+  }
+
+  if (!roleLoading && !isApproved && !isAdmin) {
+    return (
+      <div className="rounded-3xl border border-amber-300/60 bg-amber-50/70 p-6 text-sm text-amber-900 shadow-sm dark:border-amber-300/40 dark:bg-amber-500/10 dark:text-amber-100">
+        <p className="font-semibold">Tu cuenta no está autorizada para crear tokens.</p>
+        <p>Estado actual: {statusLabel ?? "Sin registro"}. Gestioná tu rol desde Perfil.</p>
+      </div>
+    );
+  }
+
+  if (!canCreate) {
+    return (
+      <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-6 text-sm text-slate-600 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80 dark:text-slate-300">
+        Este rol sólo puede consultar tokens existentes. Los productores y fábricas son los encargados de crear nuevos activos.
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Create token</h1>
-      <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl">
+      <form onSubmit={submit} className="grid grid-cols-1 gap-3 md:grid-cols-2 max-w-3xl">
         <label className="text-sm">Name
           <input className="border w-full px-2 py-1 rounded"
                  value={name} onChange={e=>setName(e.target.value)} />

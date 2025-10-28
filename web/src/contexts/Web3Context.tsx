@@ -1,6 +1,6 @@
 // web/src/contexts/Web3Context.tsx
 "use client";
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { BrowserProvider } from "ethers";
 
 type EIP1193 = {
@@ -157,12 +157,12 @@ export function Web3Provider({ children }: { children: ReactNode }) {
     setState(s => ({ ...s, account: undefined, mustConnect: true }));
   };
 
-  const getProvider = () => {
+  const getProvider = useCallback(() => {
     const eth = getEip1193();
     if (!eth) return undefined;
     // Forzamos "any" para evitar checks de red y ENS
     return new BrowserProvider(eth, "any");
-  };
+  }, []);
 
   return (
     <Ctx.Provider value={{ ...state, connect, reconnect, switchAcc, disconnect, getProvider }}>
