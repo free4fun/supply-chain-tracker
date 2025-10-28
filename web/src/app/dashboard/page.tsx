@@ -98,7 +98,7 @@ export default function Dashboard() {
         const nums = ids.map(Number);
         setTokens(nums);
         const balPairs = await Promise.all(
-          nums.map(async id => {
+          nums.map(async (id: number) => {
             const bal = await getTokenBalance(id, account);
             return [id, bal.toString()] as const;
           })
