@@ -1,15 +1,23 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { z } from "zod";
+
 import { requestUserRole } from "@/lib/sc";
 import { useToast } from "@/contexts/ToastContext";
-import { z } from "zod";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { useRole } from "@/contexts/RoleContext";
+import { useI18n } from "@/contexts/I18nContext";
 
-const ROLES = ["Producer","Factory","Retailer","Consumer"] as const;
+const ROLES = ["Producer", "Factory", "Retailer", "Consumer"] as const;
 const schema = z.object({ role: z.enum(ROLES) });
 
+enum ToastKind {
+  Success = "success",
+  Error = "error",
+}
+
 export default function ProfilePage() {
+  const { t } = useI18n();
   const { activeRole, statusLabel, isRegistered, isApproved, lastRequestedRole, lastRequestedAt, refresh, loading: roleLoading, isAdmin } = useRole();
   const initialRole = useMemo<(typeof ROLES)[number]>(() => {
     const candidate = (activeRole || lastRequestedRole) as (typeof ROLES)[number] | undefined;
@@ -29,88 +37,97 @@ export default function ProfilePage() {
     }
   }, [activeRole, lastRequestedRole]);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
     const parsed = schema.safeParse({ role });
-    if (!parsed.success) { push("error","Invalid role"); return; }
-    if (!account) { push("error","Connect wallet first"); return; }
+    if (!parsed.success) {
+      push(ToastKind.Error, t("profile.toast.invalidRole"));
+      return;
+    }
+    if (!account) {
+      push(ToastKind.Error, t("profile.toast.connectWallet"));
+      return;
+    }
     try {
       setPending(true);
       await requestUserRole(parsed.data.role);
-      push("success","Role request sent");
+      push(ToastKind.Success, t("profile.toast.success"));
       await refresh();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Transaction failed";
-      push("error", message);
+      const message = err instanceof Error ? err.message : t("profile.toast.failure");
+      push(ToastKind.Error, message);
     } finally {
       setPending(false);
     }
   }
 
-  // Wallet not connected or user rejected: guide to connect/switch
   if (mustConnect) {
     return (
       <div className="space-y-3">
-        <h1 className="text-xl font-semibold">Profile</h1>
-        <p className="text-sm">You must connect your wallet.</p>
+        <h1 className="text-xl font-semibold">{t("profile.title")}</h1>
+        <p className="text-sm">{t("profile.connect.description")}</p>
         <div className="flex gap-2">
-          <button onClick={reconnect} className="px-3 py-1 rounded bg-black text-white">Connect wallet</button>
-          <button onClick={switchAcc} className="px-3 py-1 rounded border">Switch account</button>
+          <button onClick={reconnect} className="rounded bg-black px-3 py-1 text-sm font-semibold text-white">
+            {t("profile.connect.primary")}
+          </button>
+          <button onClick={switchAcc} className="rounded border px-3 py-1 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200">
+            {t("profile.connect.secondary")}
+          </button>
         </div>
       </div>
     );
   }
 
   const lastRequestText = lastRequestedAt ? new Date(lastRequestedAt * 1000).toLocaleString() : undefined;
+  const translatedRole = activeRole ? t(`roles.${activeRole}`) : isAdmin ? t("roles.Admin") : isRegistered ? t("profile.status.unassigned") : t("common.status.none");
+  const translatedStatus = statusLabel ? translateStatus(statusLabel, t) : t("common.status.none");
+  const translatedLastRequestedRole = lastRequestedRole ? t(`roles.${lastRequestedRole}`) : undefined;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Profile</h1>
+      <h1 className="text-xl font-semibold">{t("profile.title")}</h1>
 
       <section className="space-y-3 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Estado de tu organización</h2>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("profile.status.heading")}</h2>
         <div className="grid gap-2 text-sm text-slate-700 dark:text-slate-300">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="font-medium text-slate-500 dark:text-slate-400">Cuenta conectada</span>
+            <span className="font-medium text-slate-500 dark:text-slate-400">{t("profile.status.connectedAccount")}</span>
             <span className="break-all font-semibold text-slate-800 dark:text-slate-100">{account}</span>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="font-medium text-slate-500 dark:text-slate-400">Rol actual</span>
+            <span className="font-medium text-slate-500 dark:text-slate-400">{t("profile.status.currentRole")}</span>
             <span className="font-semibold text-slate-800 dark:text-slate-100">
-              {roleLoading ? "Sincronizando…" : activeRole || (isAdmin ? "Admin" : isRegistered ? "No asignado" : "Sin registro")}
+              {roleLoading ? t("common.loading.sync") : translatedRole}
             </span>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="font-medium text-slate-500 dark:text-slate-400">Estado</span>
-            <span className="font-semibold text-indigo-600 dark:text-indigo-300">{roleLoading ? "Actualizando" : statusLabel ?? "Sin registro"}</span>
+            <span className="font-medium text-slate-500 dark:text-slate-400">{t("profile.status.state")}</span>
+            <span className="font-semibold text-indigo-600 dark:text-indigo-300">{roleLoading ? t("profile.status.updating") : translatedStatus}</span>
           </div>
           {lastRequestedRole ? (
             <div className="flex flex-col gap-0.5 rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-3 text-xs dark:border-slate-700 dark:bg-slate-900/70">
-              <span className="font-semibold text-slate-600 dark:text-slate-300">Última solicitud enviada</span>
-              <span className="font-medium text-slate-700 dark:text-slate-200">{lastRequestedRole}</span>
-              {lastRequestText ? <span className="text-slate-500 dark:text-slate-400">{lastRequestText}</span> : null}
+              <span className="font-semibold text-slate-600 dark:text-slate-300">{t("profile.status.lastRequest.heading")}</span>
+              <span className="font-medium text-slate-700 dark:text-slate-200">{translatedLastRequestedRole ?? lastRequestedRole}</span>
+              {lastRequestText ? <span className="text-slate-500 dark:text-slate-400">{t("profile.status.lastRequest.time", { time: lastRequestText })}</span> : null}
             </div>
           ) : null}
         </div>
       </section>
 
       <section className="space-y-3 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Solicitar o actualizar rol</h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          Seleccioná el rol que representa tu función dentro de la cadena de suministro. El administrador recibirá la solicitud y
-          podrá aprobarla o rechazarla según corresponda.
-        </p>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("profile.request.heading")}</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-400">{t("profile.request.description")}</p>
         <form onSubmit={submit} className="flex flex-wrap items-center gap-3">
           <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
-            Rol solicitado
+            {t("profile.request.label")}
             <select
               className="mt-1 rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
               value={role}
-              onChange={e => setRole(e.target.value as (typeof ROLES)[number])}
+              onChange={event => setRole(event.target.value as (typeof ROLES)[number])}
             >
-              {ROLES.map(r => (
-                <option key={r} value={r}>
-                  {r}
+              {ROLES.map(value => (
+                <option key={value} value={value}>
+                  {t(`roles.${value}`)}
                 </option>
               ))}
             </select>
@@ -119,16 +136,20 @@ export default function ProfilePage() {
             disabled={!account || pending}
             className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:brightness-110 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
           >
-            {pending ? "Enviando…" : "Solicitar rol"}
+            {pending ? t("profile.request.pending") : t("profile.request.submit")}
           </button>
         </form>
         {!isApproved && !roleLoading && !isAdmin ? (
-          <p className="text-xs text-amber-600 dark:text-amber-300">
-            Tu solicitud quedará pendiente hasta que el administrador la revise. Podés volver más tarde para ver el estado
-            actualizado.
-          </p>
+          <p className="text-xs text-amber-600 dark:text-amber-300">{t("profile.request.notice")}</p>
         ) : null}
       </section>
     </div>
   );
+}
+
+// Helper ensures contract status values respect the dictionary translations.
+function translateStatus(status: string, t: (key: string, params?: Record<string, string | number>) => string): string {
+  const key = `admin.users.status.${status}`;
+  const translated = t(key);
+  return translated === key ? status : translated;
 }

@@ -39,7 +39,7 @@ contract SupplyChainTransfersTest is Test {
 
         // Producer mints root token with full balance
         vm.prank(producer);
-        sc.createToken("Lote A", 1000, "{}", 0);
+        sc.createToken("Lote A", "Seed lot", 1000, "{}");
         tokenId = 1;
     }
 

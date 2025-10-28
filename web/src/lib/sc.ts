@@ -31,20 +31,31 @@ export async function changeStatusUser(addr: string, newStatus: number): Promise
 
 export async function createToken(
   name: string,
+  description: string,
   totalSupply: bigint,
-  features: string,
-  parentId: bigint
+  features: string
 ): Promise<void> {
   if (!name) throw new Error("Name required");
   if (totalSupply <= BigInt(0)) throw new Error("Supply must be > 0"); // <- sin 0n
   const sc = await getContract(true);
-  const tx = await sc.createToken(name, totalSupply, features, parentId);
+  const tx = await sc.createToken(name, description, totalSupply, features);
   await tx.wait();
 }
 
 export async function getTokenView(id: number) {
   const sc = await getContract(false);
   return sc.getTokenView(id);
+}
+
+export async function nextTokenId(): Promise<number> {
+  const sc = await getContract(false);
+  const n: bigint = await sc.nextTokenId();
+  return Number(n);
+}
+
+export async function getSuggestedParent(addr: string) {
+  const sc = await getContract(false);
+  return sc.getSuggestedParent(addr);
 }
 
 export async function transfer(to: string, tokenId: bigint, amount: bigint) {

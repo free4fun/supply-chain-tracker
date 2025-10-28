@@ -78,6 +78,11 @@
                     "internalType": "string"
                 },
                 {
+                    "name": "description",
+                    "type": "string",
+                    "internalType": "string"
+                },
+                {
                     "name": "totalSupply",
                     "type": "uint256",
                     "internalType": "uint256"
@@ -86,11 +91,6 @@
                     "name": "features",
                     "type": "string",
                     "internalType": "string"
-                },
-                {
-                    "name": "parentId",
-                    "type": "uint256",
-                    "internalType": "uint256"
                 }
             ],
             "outputs": [],
@@ -105,6 +105,25 @@
                     "type": "uint256",
                     "internalType": "uint256"
                 },
+                {
+                    "name": "userAddress",
+                    "type": "address",
+                    "internalType": "address"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "getSuggestedParent",
+            "inputs": [
                 {
                     "name": "userAddress",
                     "type": "address",
@@ -143,6 +162,11 @@
                 },
                 {
                     "name": "name",
+                    "type": "string",
+                    "internalType": "string"
+                },
+                {
+                    "name": "description",
                     "type": "string",
                     "internalType": "string"
                 },
@@ -408,6 +432,11 @@
                     "internalType": "string"
                 },
                 {
+                    "name": "description",
+                    "type": "string",
+                    "internalType": "string"
+                },
+                {
                     "name": "totalSupply",
                     "type": "uint256",
                     "internalType": "uint256"
@@ -559,6 +588,12 @@
                     "internalType": "string"
                 },
                 {
+                    "name": "description",
+                    "type": "string",
+                    "indexed": false,
+                    "internalType": "string"
+                },
+                {
                     "name": "totalSupply",
                     "type": "uint256",
                     "indexed": false,
@@ -683,6 +718,26 @@
         {
             "type": "error",
             "name": "EmptyRole",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "NotAdmin",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "NoUser",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "StatusLocked",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "ParentNotAssigned",
             "inputs": []
         }
     ],

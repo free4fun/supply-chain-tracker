@@ -5,6 +5,8 @@ pragma solidity ^0.8.24;
 error NotAdmin();
 error EmptyRole();
 error NoUser();
+error StatusLocked();
+error ParentNotAssigned();
 
 contract SupplyChain {
     // ---------- Enums ----------
@@ -32,6 +34,7 @@ contract SupplyChain {
         uint256 id;
         address creator;
         string name;
+        string description; // Optional human-readable summary
         uint256 totalSupply;
         string features; // JSON blob
         uint256 parentId; // 0 = root
@@ -71,6 +74,9 @@ contract SupplyChain {
     mapping(address => mapping(uint256 => bool)) private hasToken;
     mapping(address => uint256[]) private userTokens;
 
+    // Recommended parent token per account, updated after accepted transfers
+    mapping(address => uint256) private suggestedParentByUser;
+
     // Track user -> transfer ids
     mapping(address => uint256[]) private userTransfers;
 
@@ -81,6 +87,7 @@ contract SupplyChain {
         uint256 indexed tokenId,
         address indexed creator,
         string name,
+        string description,
         uint256 totalSupply,
         string features,
         uint256 parentId
@@ -136,6 +143,18 @@ contract SupplyChain {
         require(tokenId != 0 && tokenId < nextTokenId, "Token not found");
     }
 
+    /// @dev Compute enforced parent id for the current sender based on role and transfers.
+    function _resolveParentId(string memory role) internal view returns (uint256) {
+        if (keccak256(bytes(role)) == keccak256("Producer")) {
+            // Producers mint root assets that start the traceability tree.
+            return 0;
+        }
+
+        uint256 suggested = suggestedParentByUser[msg.sender];
+        if (suggested == 0) revert ParentNotAssigned();
+        return suggested;
+    }
+
     // ---------- Views ----------
     function isAdmin(address a) public view returns (bool) {
         return a == admin;
@@ -155,6 +174,7 @@ contract SupplyChain {
             uint256 id,
             address creator,
             string memory name,
+            string memory description,
             uint256 totalSupply,
             string memory features,
             uint256 parentId,
@@ -163,7 +183,7 @@ contract SupplyChain {
     {
         _requireToken(tokenId);
         Token storage t = tokens[tokenId];
-        return (t.id, t.creator, t.name, t.totalSupply, t.features, t.parentId, t.dateCreated);
+        return (t.id, t.creator, t.name, t.description, t.totalSupply, t.features, t.parentId, t.dateCreated);
     }
 
     /// @notice Balance of an address for a given token.
@@ -174,6 +194,11 @@ contract SupplyChain {
     {
         _requireToken(tokenId);
         return tokens[tokenId].balance[userAddress];
+    }
+
+    /// @notice Returns the enforced parent id for a future token creation by the given user.
+    function getSuggestedParent(address userAddress) external view returns (uint256) {
+        return suggestedParentByUser[userAddress];
     }
 
     /// @notice Returns transfer data as a tuple.
@@ -216,7 +241,11 @@ contract SupplyChain {
     function changeStatusUser(address userAddress, UserStatus newStatus) external onlyAdmin {
         uint256 uid = addressToUserId[userAddress];
         require(uid != 0, "User not found");
-        users[uid].status = newStatus;
+        User storage u = users[uid];
+        if (u.status != UserStatus.Pending && u.status != newStatus) {
+            revert StatusLocked();
+        }
+        u.status = newStatus;
         emit UserStatusChanged(userAddress, newStatus);
     }
 
@@ -224,9 +253,9 @@ contract SupplyChain {
     /// @notice Create a token. Only Approved users. Consumers cannot create.
     function createToken(
         string memory name,
+        string memory description,
         uint256 totalSupply,
-        string memory features,
-        uint256 parentId
+        string memory features
     ) external {
         require(_isApproved(msg.sender), "Not approved");
         string memory role = _roleOf(msg.sender);
@@ -235,12 +264,15 @@ contract SupplyChain {
         require(bytes(name).length > 0, "Name required");
         require(totalSupply > 0, "Supply required");
 
+        uint256 parentId = _resolveParentId(role);
+
         uint256 tokenId = nextTokenId++;
 
         Token storage t = tokens[tokenId];
         t.id = tokenId;
         t.creator = msg.sender;
         t.name = name;
+        t.description = description;
         t.totalSupply = totalSupply;
         t.features = features;
         t.parentId = parentId;
@@ -253,7 +285,7 @@ contract SupplyChain {
             userTokens[msg.sender].push(tokenId);
         }
 
-        emit TokenCreated(tokenId, msg.sender, name, totalSupply, features, parentId);
+        emit TokenCreated(tokenId, msg.sender, name, description, totalSupply, features, parentId);
     }
 
     // ---------- Transfers ----------
@@ -328,6 +360,9 @@ contract SupplyChain {
         } else {
             reservedPendingOut[tr.tokenId][tr.from] = 0; // defensive
         }
+
+        // Update the enforced parent suggestion so downstream creations chain correctly.
+        suggestedParentByUser[tr.to] = tr.tokenId;
 
         tr.status = TransferStatus.Accepted;
         emit TransferAccepted(transferId);

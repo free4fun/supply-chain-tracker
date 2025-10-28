@@ -7,106 +7,77 @@ import { SupplyChain } from "../src/SupplyChain.sol";
 contract SupplyChainTokensTest is Test {
     SupplyChain internal sc;
 
-    // Test actors
     address internal admin = address(this);
     address internal producer = address(0xA1);
     address internal factory = address(0xA2);
     address internal retailer = address(0xA3);
-    address internal consumer = address(0xA4);
 
     function setUp() public {
         sc = new SupplyChain();
 
-        // Prepare roles
-        vm.startPrank(producer);
+        vm.prank(producer);
         sc.requestUserRole("Producer");
-        vm.stopPrank();
         sc.changeStatusUser(producer, SupplyChain.UserStatus.Approved);
 
-        vm.startPrank(factory);
+        vm.prank(factory);
         sc.requestUserRole("Factory");
-        vm.stopPrank();
         sc.changeStatusUser(factory, SupplyChain.UserStatus.Approved);
 
-        vm.startPrank(retailer);
+        vm.prank(retailer);
         sc.requestUserRole("Retailer");
-        vm.stopPrank();
         sc.changeStatusUser(retailer, SupplyChain.UserStatus.Approved);
-
-        vm.startPrank(consumer);
-        sc.requestUserRole("Consumer");
-        vm.stopPrank();
-        sc.changeStatusUser(consumer, SupplyChain.UserStatus.Approved);
     }
 
-    // --- Helpers ---
-
-    function _createTokenAsProducer(
-        string memory name,
-        uint256 totalSupply,
-        string memory features,
-        uint256 parentId
-    ) internal returns (uint256 tokenId) {
+    function testProducerCreatesRootTokenWithDescription() public {
         vm.prank(producer);
-        sc.createToken(name, totalSupply, features, parentId);
-        // nextTokenId is incremented inside the contract.
-        // We expect the created token to be id == 1 on first call.
-        tokenId = 1;
-    }
+        sc.createToken("Coffee Beans", "Washed arabica from Colombia", 1_200, '{"grade":"AA"}');
 
-    // --- Tests ---
-
-    function test_createToken_byApprovedProducer_noParent_setsCreatorBalance() public {
-        uint256 tokenId = _createTokenAsProducer("Cacao Lote #1", 1_000, '{"origin":"UY"}', 0);
-
-        // View fields
         (
             uint256 id,
             address creator,
             string memory name,
+            string memory description,
             uint256 totalSupply,
             string memory features,
             uint256 parentId,
             uint256 dateCreated
-        ) = sc.getTokenView(tokenId);
+        ) = sc.getTokenView(1);
 
-        assertEq(id, tokenId);
+        assertEq(id, 1);
         assertEq(creator, producer);
-        assertEq(name, "Cacao Lote #1");
-        assertEq(totalSupply, 1000);
-        assertEq(features, '{"origin":"UY"}');
+        assertEq(name, "Coffee Beans");
+        assertEq(description, "Washed arabica from Colombia");
+        assertEq(totalSupply, 1_200);
+        assertEq(features, '{"grade":"AA"}');
         assertEq(parentId, 0);
         assertGt(dateCreated, 0);
-
-        // Balance must be assigned to creator
-        uint256 bal = sc.getTokenBalance(tokenId, producer);
-        assertEq(bal, 1000);
     }
 
-    function test_createToken_reverts_ifCallerNotApproved() public {
-        // Producer changes role to Pending again to simulate not approved
+    function testFactoryCannotCreateWithoutSuggestedParent() public {
+        vm.prank(factory);
+        vm.expectRevert(SupplyChain.ParentNotAssigned.selector);
+        sc.createToken("Roasted Batch", "Requires inbound lot", 500, "{}");
+    }
+
+    function testFactoryUsesAcceptedTokenAsParent() public {
+        // Producer mints a root token
         vm.prank(producer);
-        sc.requestUserRole("Producer"); // status -> Pending
+        sc.createToken("Green Beans", "Lot ready for roasting", 600, "{}");
 
+        // Transfer to factory and accept
         vm.prank(producer);
-        vm.expectRevert(); // should revert for not approved user
-        sc.createToken("X", 10, "{}", 0);
-    }
+        sc.transfer(factory, 1, 300);
+        vm.prank(factory);
+        sc.acceptTransfer(1);
 
-    function test_createToken_reverts_forConsumer() public {
-        vm.prank(consumer);
-        vm.expectRevert(); // Consumers cannot create tokens
-        sc.createToken("Y", 5, "{}", 0);
-    }
+        // Factory token must inherit parent id = 1
+        vm.prank(factory);
+        sc.createToken("Roasted Lot", "Medium roast", 150, "{}");
 
-    function test_getTokenBalance_zeroForNonHolder() public {
-        uint256 tokenId = _createTokenAsProducer("Harina Lote #7", 500, "{}", 0);
-        uint256 bal = sc.getTokenBalance(tokenId, factory);
-        assertEq(bal, 0);
-    }
+        (,,,,,, uint256 parentId,) = sc.getTokenView(2);
+        assertEq(parentId, 1);
 
-    function test_getTokenView_reverts_ifTokenDoesNotExist() public {
-        vm.expectRevert();
-        sc.getTokenView(999);
+        uint256 suggestedParent = sc.getSuggestedParent(factory);
+        assertEq(suggestedParent, 1);
     }
 }

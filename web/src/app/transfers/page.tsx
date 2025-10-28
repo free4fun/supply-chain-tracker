@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { isAddress } from "ethers";
 import { z } from "zod";
 
@@ -19,6 +19,7 @@ import {
   transfer,
   type UserView,
 } from "@/lib/sc";
+import { useI18n } from "@/contexts/I18nContext";
 
 const STATUS_LABELS = ["Pending", "Accepted", "Rejected"] as const;
 const NEXT_ROLE: Record<string, string | null> = {
@@ -28,12 +29,6 @@ const NEXT_ROLE: Record<string, string | null> = {
   Consumer: null,
 };
 
-const schema = z.object({
-  recipient: z.string().refine(isAddress, "Invalid recipient"),
-  tokenId: z.coerce.number().int().min(1, "Token ID must be >= 1"),
-  amount: z.coerce.bigint().refine(v => v > 0n, "Amount must be > 0"),
-});
-
 type TransferRow = { id: number; from: string; to: string; tokenId: number; amount: number; status: number };
 type TokenOption = { id: number; balance: string };
 type RecipientOption = { addr: string; role: string };
@@ -42,6 +37,17 @@ export default function TransfersPage() {
   const { account, mustConnect } = useWeb3();
   const { activeRole, isApproved, loading: roleLoading, statusLabel, isAdmin } = useRole();
   const { push } = useToast();
+  const { t } = useI18n();
+
+  const schema = useMemo(
+    () =>
+      z.object({
+        recipient: z.string().refine(isAddress, t("transfers.errors.recipient")),
+        tokenId: z.coerce.number().int().min(1, t("transfers.errors.tokenId")),
+        amount: z.coerce.bigint().refine(v => v > 0n, t("transfers.errors.amount")),
+      }),
+    [t]
+  );
 
   const [tokenOptions, setTokenOptions] = useState<TokenOption[]>([]);
   const [recipientOptions, setRecipientOptions] = useState<RecipientOption[]>([]);
@@ -198,11 +204,11 @@ export default function TransfersPage() {
     event.preventDefault();
     const recipient = selectedRecipient === "__custom" ? customRecipient : selectedRecipient;
     if (!recipient) {
-      push("error", "Seleccioná un destinatario");
+      push("error", t("transfers.errors.noRecipient"));
       return;
     }
     if (!selectedToken) {
-      push("error", "Elegí un token para transferir");
+      push("error", t("transfers.errors.noToken"));
       return;
     }
     const parsed = schema.safeParse({ recipient, tokenId: selectedToken, amount });
@@ -213,11 +219,11 @@ export default function TransfersPage() {
     try {
       setPending(true);
       await transfer(parsed.data.recipient, BigInt(parsed.data.tokenId), parsed.data.amount);
-      push("success", "Transfer created");
+      push("success", t("transfers.success.created"));
       await refreshTransfers();
       await refreshTokens({ silent: true });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Transaction failed";
+      const message = err instanceof Error ? err.message : t("transfers.errors.transaction");
       push("error", message);
     } finally {
       setPending(false);
@@ -225,14 +231,14 @@ export default function TransfersPage() {
   };
 
   if (mustConnect) {
-    return <p className="text-sm text-slate-600 dark:text-slate-300">Conectá tu wallet para gestionar transferencias.</p>;
+    return <p className="text-sm text-slate-600 dark:text-slate-300">{t("transfers.connectPrompt")}</p>;
   }
 
   if (!roleLoading && !isApproved && !isAdmin) {
     return (
       <div className="rounded-3xl border border-amber-300/60 bg-amber-50/70 p-6 text-sm text-amber-900 shadow-sm dark:border-amber-300/40 dark:bg-amber-500/10 dark:text-amber-100">
-        <p className="font-semibold">Tu cuenta no está aprobada para realizar transferencias.</p>
-        <p>Estado actual: {statusLabel ?? "Sin registro"}. Gestioná tu rol desde la sección Perfil.</p>
+        <p className="font-semibold">{t("transfers.notApprovedTitle")}</p>
+        <p>{t("transfers.notApprovedBody", { status: statusLabel ?? t("common.status.none") })}</p>
       </div>
     );
   }
@@ -241,27 +247,27 @@ export default function TransfersPage() {
     <div className="space-y-8">
       <section className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Nueva transferencia</h1>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">{t("transfers.title")}</h1>
           {nextRole ? (
             <span className="rounded-full border border-indigo-300/60 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-600 dark:border-indigo-500/40 dark:text-indigo-300">
-              Destinatarios habilitados: {nextRole}
+              {t("transfers.allowedRecipients", { role: nextRole })}
             </span>
           ) : (
-            <span className="text-xs text-slate-500 dark:text-slate-400">Este rol sólo recibe transferencias.</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{t("transfers.receiveOnly")}</span>
           )}
         </div>
 
         {canCreate ? (
           <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
-              Token disponible
+              {t("transfers.form.token")}
               <select
                 className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                 value={selectedToken}
                 onChange={event => setSelectedToken(event.target.value)}
               >
                 <option value="" disabled>
-                  {loadingTokens ? "Cargando..." : "Seleccioná un token"}
+                  {loadingTokens ? t("transfers.form.loadingTokens") : t("transfers.form.selectToken")}
                 </option>
                 {tokenOptions.map(option => (
                   <option key={option.id} value={option.id}>
@@ -272,33 +278,37 @@ export default function TransfersPage() {
             </label>
 
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
-              Cantidad a transferir
+              {t("transfers.form.amount")}
               <input
                 className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                 value={amount}
                 onChange={event => setAmount(event.target.value)}
-                placeholder="Cantidad"
+                placeholder={t("transfers.form.amountPlaceholder")}
                 inputMode="numeric"
                 min="1"
               />
             </label>
 
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300 md:col-span-2">
-              Destinatario
+              {t("transfers.form.recipient")}
               <select
                 className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                 value={selectedRecipient}
                 onChange={event => setSelectedRecipient(event.target.value)}
               >
                 <option value="" disabled>
-                  {loadingRecipients ? "Cargando destinatarios..." : nextRole ? `Seleccioná un ${nextRole}` : "Sin destinatarios"}
+                  {loadingRecipients
+                    ? t("transfers.form.loadingRecipients")
+                    : nextRole
+                      ? t("transfers.form.selectRole", { role: nextRole })
+                      : t("transfers.form.noRecipients")}
                 </option>
                 {recipientOptions.map(option => (
                   <option key={option.addr} value={option.addr}>
                     {option.addr}
                   </option>
                 ))}
-                <option value="__custom">Ingresar dirección manualmente…</option>
+                <option value="__custom">{t("transfers.form.customRecipient")}</option>
               </select>
             </label>
 
@@ -316,41 +326,37 @@ export default function TransfersPage() {
                 disabled={disabled}
                 className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:brightness-110 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
               >
-                {pending ? "Creando…" : "Crear transferencia"}
+                {pending ? t("transfers.form.creating") : t("transfers.form.submit")}
               </button>
             </div>
           </form>
         ) : (
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            Este rol sólo puede recibir transferencias. Revisá el panel de Entrantes para aceptar o rechazar envíos pendientes.
-          </p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">{t("transfers.receiveMessage")}</p>
         )}
       </section>
 
       <section className="space-y-3 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Entrantes</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("transfers.incoming.title")}</h2>
           <button
             onClick={() => refreshTransfers()}
             disabled={loadingTransfers}
             className="rounded-full border border-slate-300/70 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200"
           >
-            {loadingTransfers ? "Actualizando…" : "Actualizar"}
+            {loadingTransfers ? t("transfers.refreshing") : t("transfers.refresh")}
           </button>
         </div>
         <div className="grid gap-3">
-          {incoming.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">No hay transferencias entrantes.</p> : null}
+          {incoming.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">{t("transfers.incoming.empty")}</p> : null}
           {incoming.map(row => (
             <div
               key={row.id}
               className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
             >
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                  #{row.id} · Token {row.tokenId} · Cantidad {row.amount}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Desde {row.from}</p>
-                <p className="text-xs text-indigo-600 dark:text-indigo-300">Estado: {STATUS_LABELS[row.status as 0 | 1 | 2] ?? row.status}</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("transfers.incoming.rowTitle", { id: row.id, token: row.tokenId, amount: row.amount })}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t("transfers.incoming.from", { address: row.from })}</p>
+                <p className="text-xs text-indigo-600 dark:text-indigo-300">{t("transfers.status", { status: STATUS_LABELS[row.status as 0 | 1 | 2] ?? String(row.status) })}</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -358,32 +364,32 @@ export default function TransfersPage() {
                   onClick={async () => {
                     try {
                       await acceptTransfer(BigInt(row.id));
-                      push("success", "Transfer accepted");
+                      push("success", t("transfers.success.accepted"));
                       await refreshTransfers();
                     } catch (err: unknown) {
-                      const message = err instanceof Error ? err.message : "Operation failed";
+                      const message = err instanceof Error ? err.message : t("transfers.errors.operation");
                       push("error", message);
                     }
                   }}
                   disabled={row.status !== 0 || !account}
                 >
-                  Aceptar
+                  {t("transfers.actions.accept")}
                 </button>
                 <button
                   className="rounded-full border border-slate-300/70 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-rose-400 hover:text-rose-600 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200"
                   onClick={async () => {
                     try {
                       await rejectTransfer(BigInt(row.id));
-                      push("success", "Transfer rejected");
+                      push("success", t("transfers.success.rejected"));
                       await refreshTransfers();
                     } catch (err: unknown) {
-                      const message = err instanceof Error ? err.message : "Operation failed";
+                      const message = err instanceof Error ? err.message : t("transfers.errors.operation");
                       push("error", message);
                     }
                   }}
                   disabled={row.status !== 0 || !account}
                 >
-                  Rechazar
+                  {t("transfers.actions.reject")}
                 </button>
               </div>
             </div>
@@ -392,19 +398,17 @@ export default function TransfersPage() {
       </section>
 
       <section className="space-y-3 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Salientes</h2>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("transfers.outgoing.title")}</h2>
         <div className="grid gap-3">
-          {outgoing.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">No hay transferencias salientes.</p> : null}
+          {outgoing.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">{t("transfers.outgoing.empty")}</p> : null}
           {outgoing.map(row => (
             <div
               key={row.id}
               className="rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
             >
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                #{row.id} · Token {row.tokenId} · Cantidad {row.amount}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Para {row.to}</p>
-              <p className="text-xs text-indigo-600 dark:text-indigo-300">Estado: {STATUS_LABELS[row.status as 0 | 1 | 2] ?? row.status}</p>
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("transfers.outgoing.rowTitle", { id: row.id, token: row.tokenId, amount: row.amount })}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t("transfers.outgoing.to", { address: row.to })}</p>
+              <p className="text-xs text-indigo-600 dark:text-indigo-300">{t("transfers.status", { status: STATUS_LABELS[row.status as 0 | 1 | 2] ?? String(row.status) })}</p>
             </div>
           ))}
         </div>

@@ -7,70 +7,76 @@ import { useWeb3 } from "@/contexts/Web3Context";
 import { useRole } from "@/contexts/RoleContext";
 import { useBlockWatcher } from "@/hooks/useBlockWatcher";
 import { getUserTokens, getTokenBalance } from "@/lib/sc";
+import { useI18n } from "@/contexts/I18nContext";
 
-const ROLE_PANELS = {
+// Translation-driven panel configuration keeps copy in sync across languages.
+type PanelConfig = {
+  titleKey: string;
+  nextRoleKey?: string;
+  tipKeys: readonly string[];
+  actions: readonly { href: string; labelKey: string }[];
+};
+
+const ROLE_PANELS: Record<string, PanelConfig> = {
   Producer: {
-    title: "Productor",
-    next: "Factory",
-    tips: [
-      "Tokenizá lotes de materia prima desde Crear activos.",
-      "Verificá tus balances antes de despachar.",
-      "Generá transferencias únicamente hacia fábricas aprobadas.",
+    titleKey: "roles.Producer",
+    nextRoleKey: "roles.Factory",
+    tipKeys: [
+      "dashboard.roles.producer.tip1",
+      "dashboard.roles.producer.tip2",
+      "dashboard.roles.producer.tip3",
     ],
     actions: [
-      { href: "/tokens/create", label: "Crear nuevo lote" },
-      { href: "/transfers", label: "Transferir a fábrica" },
+      { href: "/tokens/create", labelKey: "dashboard.roles.producer.actions.create" },
+      { href: "/transfers", labelKey: "dashboard.roles.producer.actions.transfer" },
     ],
   },
   Factory: {
-    title: "Fábrica",
-    next: "Retailer",
-    tips: [
-      "Aceptá recepciones pendientes para liberar stock.",
-      "Creá productos derivados usando el campo Parent ID.",
-      "Despachá únicamente a retailers habilitados.",
+    titleKey: "roles.Factory",
+    nextRoleKey: "roles.Retailer",
+    tipKeys: [
+      "dashboard.roles.factory.tip1",
+      "dashboard.roles.factory.tip2",
+      "dashboard.roles.factory.tip3",
     ],
     actions: [
-      { href: "/tokens/create", label: "Crear derivado" },
-      { href: "/transfers", label: "Enviar a retailer" },
+      { href: "/tokens/create", labelKey: "dashboard.roles.factory.actions.create" },
+      { href: "/transfers", labelKey: "dashboard.roles.factory.actions.transfer" },
     ],
   },
   Retailer: {
-    title: "Retailer",
-    next: "Consumer",
-    tips: [
-      "Aceptá lotes entrantes desde la bandeja de Transfers.",
-      "Controlá inventario disponible en el Dashboard.",
-      "Programá entregas finales a consumidores registrados.",
+    titleKey: "roles.Retailer",
+    nextRoleKey: "roles.Consumer",
+    tipKeys: [
+      "dashboard.roles.retailer.tip1",
+      "dashboard.roles.retailer.tip2",
+      "dashboard.roles.retailer.tip3",
     ],
-    actions: [
-      { href: "/transfers", label: "Transferir a consumidor" },
-    ],
+    actions: [{ href: "/transfers", labelKey: "dashboard.roles.retailer.actions.transfer" }],
   },
   Consumer: {
-    title: "Consumer",
-    tips: [
-      "Aceptá transferencias pendientes para cerrar la trazabilidad.",
-      "Revisá el historial del lote y sus metadatos.",
-      "Comparte comprobantes de origen con tus clientes finales.",
+    titleKey: "roles.Consumer",
+    tipKeys: [
+      "dashboard.roles.consumer.tip1",
+      "dashboard.roles.consumer.tip2",
+      "dashboard.roles.consumer.tip3",
     ],
-    actions: [
-      { href: "/dashboard", label: "Ver trazabilidad" },
-    ],
+    actions: [{ href: "/dashboard", labelKey: "dashboard.roles.consumer.actions.trace" }],
   },
 } as const;
 
-const ADMIN_PANEL = {
-  title: "Administrador",
-  tips: [
-    "Supervisá solicitudes recientes en Admin · Users.",
-    "Actualizá estados de usuarios según la documentación recibida.",
-    "Verificá actividades inusuales y cambios de rol.",
+const ADMIN_PANEL: PanelConfig = {
+  titleKey: "roles.Admin",
+  tipKeys: [
+    "dashboard.roles.admin.tip1",
+    "dashboard.roles.admin.tip2",
+    "dashboard.roles.admin.tip3",
   ],
-  actions: [{ href: "/admin/users", label: "Ir a gestión de usuarios" }],
-} as const;
+  actions: [{ href: "/admin/users", labelKey: "dashboard.roles.admin.actions.manage" }],
+};
 
 export default function Dashboard() {
+  const { t } = useI18n();
   const { account, mustConnect, error } = useWeb3();
   const { activeRole, isApproved, loading: roleLoading, statusLabel, isAdmin } = useRole();
 
@@ -114,7 +120,7 @@ export default function Dashboard() {
   useBlockWatcher(() => refreshBalances({ silent: true }), [refreshBalances]);
 
   const panel = useMemo(() => {
-    if (activeRole && (ROLE_PANELS as Record<string, unknown>)[activeRole]) {
+    if (activeRole && (ROLE_PANELS as Record<string, PanelConfig | undefined>)[activeRole]) {
       return ROLE_PANELS[activeRole as keyof typeof ROLE_PANELS];
     }
     if (isAdmin) return ADMIN_PANEL;
@@ -124,7 +130,7 @@ export default function Dashboard() {
   if (mustConnect) {
     return (
       <div className="rounded-3xl border border-slate-200/70 bg-white/80 p-6 text-sm text-slate-600 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70 dark:text-slate-300">
-        Conectá tu wallet para sincronizar balances y recomendaciones por rol.
+        {t("dashboard.connectPrompt")}
       </div>
     );
   }
@@ -134,10 +140,12 @@ export default function Dashboard() {
   if (!roleLoading && !isApproved && !isAdmin) {
     return (
       <div className="space-y-3 rounded-3xl border border-amber-300/60 bg-amber-50/70 p-6 text-sm text-amber-900 shadow-sm dark:border-amber-300/40 dark:bg-amber-500/10 dark:text-amber-100">
-        <p className="font-semibold">Tu cuenta aún no está aprobada.</p>
+        <p className="font-semibold">{t("dashboard.pending.title")}</p>
         <p>
-          Estado actual: <span className="font-medium">{statusLabel ?? "Sin registro"}</span>. Visitá la sección
-          <Link href="/profile" className="ml-1 underline underline-offset-4">Perfil</Link> para solicitar o revisar tu rol.
+          {t("dashboard.pending.message", { status: statusLabel ? translateStatus(statusLabel, t) : t("common.status.none") })}
+          <Link href="/profile" className="ml-1 underline underline-offset-4">
+            {t("nav.profile")}
+          </Link>
         </p>
       </div>
     );
@@ -149,21 +157,21 @@ export default function Dashboard() {
         <section className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Inventario on-chain</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Balances por token asignados a tu cuenta actual.</p>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("dashboard.inventory.title")}</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t("dashboard.inventory.subtitle")}</p>
             </div>
             <button
               onClick={() => refreshBalances()}
               disabled={loading}
               className="rounded-full border border-slate-300/70 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200"
             >
-              {loading ? "Actualizando…" : "Actualizar"}
+              {loading ? t("dashboard.inventory.refreshing") : t("dashboard.inventory.refresh")}
             </button>
           </div>
 
           <div className="grid gap-3">
             {tokens.length === 0 && !loading ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">Sin tokens registrados en esta cuenta.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{t("dashboard.inventory.empty")}</p>
             ) : null}
             {tokens.map(id => (
               <div
@@ -171,8 +179,8 @@ export default function Dashboard() {
                 className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
               >
                 <div>
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Token #{id}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Balance disponible</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("dashboard.inventory.token", { id })}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{t("dashboard.inventory.balanceLabel")}</p>
                 </div>
                 <span className="text-lg font-semibold text-indigo-600 dark:text-indigo-300">{balances[id] ?? "…"}</span>
               </div>
@@ -183,19 +191,19 @@ export default function Dashboard() {
         {panel ? (
           <aside className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
             <div className="space-y-1">
-              <h3 className="text-base font-semibold text-slate-900 dark:text-white">{panel.title}</h3>
-              {panel.next ? (
-                <p className="text-xs text-slate-500 dark:text-slate-400">Próximo eslabón permitido: {panel.next}</p>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t(panel.titleKey)}</h3>
+              {panel.nextRoleKey ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t("dashboard.panel.next", { role: t(panel.nextRoleKey) })}</p>
               ) : null}
             </div>
             <ul className="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
-              {panel.tips.map(tip => (
-                <li key={tip} className="rounded-xl border border-slate-200/60 bg-white/80 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/70">
-                  {tip}
+              {panel.tipKeys.map(tipKey => (
+                <li key={tipKey} className="rounded-xl border border-slate-200/60 bg-white/80 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/70">
+                  {t(tipKey)}
                 </li>
               ))}
             </ul>
-            {panel.actions?.length ? (
+            {panel.actions.length ? (
               <div className="flex flex-wrap gap-2">
                 {panel.actions.map(action => (
                   <Link
@@ -203,7 +211,7 @@ export default function Dashboard() {
                     href={action.href}
                     className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
                   >
-                    {action.label}
+                    {t(action.labelKey)}
                   </Link>
                 ))}
               </div>
@@ -213,4 +221,11 @@ export default function Dashboard() {
       </div>
     </div>
   );
+}
+
+// Helper reused to normalize status text according to the translation table.
+function translateStatus(status: string, t: (key: string, params?: Record<string, string | number>) => string): string {
+  const key = `admin.users.status.${status}`;
+  const translated = t(key);
+  return translated === key ? status : translated;
 }
