@@ -92,7 +92,7 @@ contract SupplyChainTokensTest is Test {
         uint256 suggestedParent = sc.getSuggestedParent(factory);
         assertEq(suggestedParent, 2);
 
-        (,,,,,,,, uint256 availableSupplyParent) = sc.getTokenView(1);
+        (,,,,,,, uint256 availableSupplyParent) = sc.getTokenView(1);
         assertEq(availableSupplyParent, 450);
 
         SupplyChain.Component[] memory inputs = sc.getTokenInputs(2);
@@ -132,8 +132,8 @@ contract SupplyChainTokensTest is Test {
         sc.createToken("Blend Especial", "Corte de malbec y cabernet", 150, "{}", compIds, compAmts);
 
         // Verify balances were reduced
-        (,,,,,,,, uint256 availableMalbec) = sc.getTokenView(1);
-        (,,,,,,,, uint256 availableCabernet) = sc.getTokenView(2);
+        (,,,,,,, uint256 availableMalbec) = sc.getTokenView(1);
+        (,,,,,,, uint256 availableCabernet) = sc.getTokenView(2);
         assertEq(availableMalbec, 400 - 80);
         assertEq(availableCabernet, 300 - 120);
 

@@ -58,7 +58,7 @@ export function useBlockWatcher(callback: Callback, deps: unknown[] = []) {
 
     return () => {
       mounted = false;
-      provider?.off?.("block", handler);
+      provider.off("block", handler);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getProvider, ...deps]);

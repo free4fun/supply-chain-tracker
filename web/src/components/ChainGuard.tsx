@@ -11,20 +11,19 @@ export default function ChainGuard({ children }: { children: React.ReactNode }) 
   const { t } = useI18n();
 
   async function switchChain() {
-    const eth = window.ethereum;
+    const eth = (window as any).ethereum;
     try {
-      await eth?.request({ method: "wallet_switchEthereumChain", params: [{ chainId: ANVIL_HEX }] });
-    } catch (e: unknown) {
-      const err = e as { code?: number; message?: string };
-      if (err?.code === 4902) {
-        await eth?.request({ method: "wallet_addEthereumChain", params: [{
+      await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: ANVIL_HEX }] });
+    } catch (e: any) {
+      if (e?.code === 4902) {
+        await eth.request({ method: "wallet_addEthereumChain", params: [{
           chainId: ANVIL_HEX,
           chainName: "Anvil 31337",
           nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
           rpcUrls: [process.env.NEXT_PUBLIC_RPC_URL || "http://127.0.0.1:8545"],
         }]});
       } else {
-        setMsg(err?.message ?? t("chainGuard.error"));
+        setMsg(e?.message ?? t("chainGuard.error"));
       }
     }
   }
@@ -45,11 +44,11 @@ export default function ChainGuard({ children }: { children: React.ReactNode }) 
             <span className="font-semibold">{t("chainGuard.wrongNetwork", { chain: "31337" })}</span>
             <button
               onClick={switchChain}
-              className="rounded-full border border-amber-400/60 px-3 py-1 text-xs font-semibold text-amber-800 transition hover:border-amber-500 hover:text-amber-700 focus-outline-accent dark:border-amber-300/50 dark:text-amber-100 dark:hover:text-white"
+              className="rounded-full border border-amber-400/60 px-3 py-1 text-xs font-semibold text-amber-800 transition hover:border-amber-500 hover:text-amber-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:border-amber-300/50 dark:text-amber-100 dark:hover:text-white"
             >
               {t("chainGuard.switch")}
             </button>
-            {msg && <span className="text-xs font-medium text-rose-600 dark:text-rose-400">{msg}</span>}
+            {msg && <span className="text-xs font-medium text-rose-500 dark:text-rose-300">{msg}</span>}
           </div>
         </div>
       ) : null}

@@ -1,5 +1,5 @@
-import { render } from "@testing-library/react";
-import { describe, it, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
 import TransfersPage from "./page";
 
 vi.mock("@/contexts/Web3Context", () => ({
@@ -13,8 +13,13 @@ vi.mock("@/lib/sc", () => ({
   getTransfer: vi.fn(async () => {})
 }));
 
-describe.skip("TransfersPage", () => {
-  it("renders form and creates transfer intent (skipped: UI structure changed)", async () => {
+describe("TransfersPage", () => {
+  it("renders form and creates transfer intent", async () => {
     render(<TransfersPage />);
+    expect(screen.getByText(/New transfer/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText(/Recipient/i), { target: { value: "0x0000000000000000000000000000000000000002" }});
+    fireEvent.change(screen.getByPlaceholderText(/Token ID/i), { target: { value: "1" }});
+    fireEvent.change(screen.getByPlaceholderText(/Amount/i), { target: { value: "5" }});
+    fireEvent.click(screen.getByText("Create"));
   });
 });

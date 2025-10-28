@@ -98,7 +98,7 @@ export default function Dashboard() {
         const nums = ids.map(Number);
         setTokens(nums);
         const balPairs = await Promise.all(
-          nums.map(async (id: number) => {
+          nums.map(async id => {
             const bal = await getTokenBalance(id, account);
             return [id, bal.toString()] as const;
           })
@@ -129,7 +129,7 @@ export default function Dashboard() {
 
   if (mustConnect) {
     return (
-      <div className="rounded-3xl border border-surface bg-surface-2 p-6 text-sm text-slate-600 shadow-sm dark:text-slate-300">
+      <div className="rounded-3xl border border-slate-200/70 bg-white/80 p-6 text-sm text-slate-600 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70 dark:text-slate-300">
         {t("dashboard.connectPrompt")}
       </div>
     );
@@ -154,7 +154,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       <div className="grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-  <section className="space-y-4 rounded-3xl border border-surface bg-surface-2 p-6 shadow-inner">
+        <section className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("dashboard.inventory.title")}</h2>
@@ -163,7 +163,7 @@ export default function Dashboard() {
             <button
               onClick={() => refreshBalances()}
               disabled={loading}
-              className="rounded-full border border-slate-300/70 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-accent hover:text-accent disabled:opacity-60 dark:border-slate-700 dark:text-slate-200"
+              className="rounded-full border border-slate-300/70 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200"
             >
               {loading ? t("dashboard.inventory.refreshing") : t("dashboard.inventory.refresh")}
             </button>
@@ -176,20 +176,20 @@ export default function Dashboard() {
             {tokens.map(id => (
               <div
                 key={id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-surface bg-surface-3 px-4 py-3 shadow-sm hover:bg-surface-3"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
               >
                 <div>
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("dashboard.inventory.token", { id })}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{t("dashboard.inventory.balanceLabel")}</p>
                 </div>
-                <span className="text-lg font-semibold text-accent">{balances[id] ?? "..."}</span>
+                <span className="text-lg font-semibold text-indigo-600 dark:text-indigo-300">{balances[id] ?? "…"}</span>
               </div>
             ))}
           </div>
         </section>
 
         {panel ? (
-          <aside className="space-y-4 rounded-3xl border border-surface bg-surface-2 p-6 shadow-inner">
+          <aside className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
             <div className="space-y-1">
               <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t(panel.titleKey)}</h3>
               {panel.nextRoleKey ? (
@@ -198,7 +198,7 @@ export default function Dashboard() {
             </div>
             <ul className="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
               {panel.tipKeys.map(tipKey => (
-                <li key={tipKey} className="rounded-xl border border-surface bg-surface-3 px-3 py-2 hover:bg-surface-3">
+                <li key={tipKey} className="rounded-xl border border-slate-200/60 bg-white/80 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/70">
                   {t(tipKey)}
                 </li>
               ))}
@@ -209,7 +209,7 @@ export default function Dashboard() {
                   <Link
                     key={action.href}
                     href={action.href}
-                    className="rounded-full px-4 py-2 text-xs font-semibold text-white shadow-md transition hover:brightness-110 btn-primary focus-outline-accent"
+                    className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
                   >
                     {t(action.labelKey)}
                   </Link>

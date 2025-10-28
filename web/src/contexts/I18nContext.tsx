@@ -22,15 +22,12 @@ function formatWithParams(template: string, params?: TranslationParams): string 
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  // Important for hydration: default to 'en' so SSR and initial client render match
   const [lang, setLang] = useState<Language>("en");
 
-  // After mount, read the preference and update. This avoids hydration mismatches.
   useEffect(() => {
     try {
       const stored = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
       if (stored && AVAILABLE_LANGS.includes(stored as Language)) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLang(stored as Language);
       }
     } catch {}

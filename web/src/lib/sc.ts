@@ -166,6 +166,7 @@ export async function getUserById(id: number): Promise<UserView> {
 }
 
 export async function listUsers(): Promise<UserView[]> {
+  const sc = await getContract(false);
   const n = await nextUserId();
   const out: UserView[] = [];
   for (let i = 1; i < n; i++) {

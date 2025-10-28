@@ -1,3 +1,4 @@
+// web/src/app/tokens/create/page.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -76,12 +77,12 @@ const ROLE_CONFIG: Record<string, RoleConfig> = {
       soil: "Franco arenoso",
     },
     fields: [
-      { key: "grapeVariety", label: "Variedad de uva", placeholder: "Malbec, Cabernet, Torrontés..." },
+      { key: "grapeVariety", label: "Variedad de uva", placeholder: "Malbec, Cabernet, Torrontés…" },
       { key: "harvestDate", label: "Fecha de cosecha", type: "date" },
       { key: "parcel", label: "Cuadro o parcela", placeholder: "Cuadro 5 - Norte" },
       { key: "weightKg", label: "Peso total (kg)", type: "number", helper: "Peso exacto recibido en bodega." },
       { key: "vineyardAltitude", label: "Altitud del viñedo (msnm)", type: "number" },
-      { key: "soil", label: "Tipo de suelo", placeholder: "Aluvional, calcáreo..." },
+      { key: "soil", label: "Tipo de suelo", placeholder: "Aluvional, calcáreo…" },
     ],
   },
   Factory: {
@@ -139,7 +140,7 @@ const ROLE_CONFIG: Record<string, RoleConfig> = {
       { key: "packName", label: "Nombre del pack", placeholder: "Selección Andina" },
       { key: "packagingDate", label: "Fecha de armado", type: "date" },
       { key: "bottleCount", label: "Cantidad de botellas", type: "number" },
-      { key: "pairing", label: "Maridajes sugeridos", placeholder: "Carnes, quesos maduros..." },
+      { key: "pairing", label: "Maridajes sugeridos", placeholder: "Carnes, quesos maduros…" },
       { key: "market", label: "Mercado destino", placeholder: "Exportación, mercado interno" },
       { key: "shelfLifeMonths", label: "Meses de vida útil", type: "number" },
     ],
@@ -563,7 +564,7 @@ export default function CreateTokenPage() {
             </div>
 
             {inventoryLoading ? (
-              <p className="text-sm text-slate-500">Cargando inventario...</p>
+              <p className="text-sm text-slate-500">Cargando inventario…</p>
             ) : availableInventory.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-slate-300/70 bg-white/60 p-4 text-sm text-slate-500">{config.emptyInventory}</p>
             ) : (
@@ -577,7 +578,7 @@ export default function CreateTokenPage() {
                         onChange={event => updateInputRow(index, { tokenId: event.target.value ? Number(event.target.value) : null })}
                         className="rounded-xl border border-white/70 bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
                       >
-                        <option value="">Seleccioná un token...</option>
+                        <option value="">Seleccioná un token…</option>
                         {availableInventory.map(item => (
                           <option key={item.id} value={item.id}>
                             #{item.id} · {item.name} · saldo {item.balance.toString()}
@@ -631,7 +632,7 @@ export default function CreateTokenPage() {
             disabled={pending || (config.requiresComponents && availableInventory.length === 0)}
             className="rounded-full bg-slate-900 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition hover:bg-slate-800 disabled:opacity-60"
           >
-            {pending ? "Registrando..." : "Registrar token"}
+            {pending ? "Registrando…" : "Registrar token"}
           </button>
         </footer>
       </form>
