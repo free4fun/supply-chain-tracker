@@ -87,6 +87,6 @@ contract SupplyChainCoreTest is Test {
 
         vm.prank(factory);
         vm.expectRevert(SupplyChain.ParentNotAssigned.selector);
-        sc.createToken("Derived", "", 100, "{}");
+        sc.createToken("Derived", "desc", 100, "{}");
     }
 }

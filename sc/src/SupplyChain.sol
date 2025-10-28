@@ -5,10 +5,12 @@ pragma solidity ^0.8.24;
 error NotAdmin();
 error EmptyRole();
 error NoUser();
-error StatusLocked();
-error ParentNotAssigned();
 
 contract SupplyChain {
+    // ---------- Custom errors (contract scope) ----------
+    error StatusLocked();
+    error ParentNotAssigned();
+
     // ---------- Enums ----------
     enum UserStatus {
         Pending,
