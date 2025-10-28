@@ -5,8 +5,10 @@ import { BrowserProvider } from "ethers";
 
 type EIP1193 = {
   request: (args: { method: string; params?: any[] }) => Promise<any>;
-  addEventListener?: (ev: "accountsChanged" | "chainChanged", cb: (...a: any[]) => void) => void;
-  removeEventListener?: (ev: "accountsChanged" | "chainChanged", cb: (...a: any[]) => void) => void;
+  on?: (ev: string, cb: (...a: any[]) => void) => void;
+  removeListener?: (ev: string, cb: (...a: any[]) => void) => void;
+  addEventListener?: (ev: string, cb: (...a: any[]) => void) => void;
+  removeEventListener?: (ev: string, cb: (...a: any[]) => void) => void;
 };
 
 function getEip1193(): EIP1193 | undefined {
@@ -101,15 +103,49 @@ export function Web3Provider({ children }: { children: ReactNode }) {
     })();
 
     const onAcc = (a: string[]) =>
-      setState(s => ({ ...s, account: a?.[0], mustConnect: !(a && a[0]) }));
+      setState(s => ({
+        ...s,
+        account: a?.[0],
+        mustConnect: !(a && a[0]),
+        chainId: a?.[0] ? s.chainId : undefined,
+        error: undefined,
+      }));
     const onChain = (hex: string | number) =>
-      setState(s => ({ ...s, chainId: typeof hex === "string" ? parseInt(hex, 16) : Number(hex) }));
+      setState(s => ({
+        ...s,
+        chainId: typeof hex === "string" ? parseInt(hex, 16) : Number(hex),
+      }));
+    const onDisconnect = () =>
+      setState(s => ({
+        ...s,
+        account: undefined,
+        chainId: undefined,
+        mustConnect: true,
+      }));
+    const subscribe = (event: string, handler: (...args: any[]) => void) => {
+      if (typeof eth.on === "function" && typeof eth.removeListener === "function") {
+        eth.on(event, handler);
+        return () => eth.removeListener?.(event, handler);
+      }
+      if (typeof eth.addEventListener === "function" && typeof eth.removeEventListener === "function") {
+        eth.addEventListener(event as never, handler);
+        return () => eth.removeEventListener?.(event as never, handler);
+      }
+      return () => {};
+    };
 
-    eth.addEventListener?.("accountsChanged", onAcc);
-    eth.addEventListener?.("chainChanged", onChain);
+    const unsubs = [
+      subscribe("accountsChanged", onAcc),
+      subscribe("chainChanged", onChain),
+      subscribe("disconnect", onDisconnect),
+    ];
+
     return () => {
-      eth.removeEventListener?.("accountsChanged", onAcc);
-      eth.removeEventListener?.("chainChanged", onChain);
+      unsubs.forEach(unsub => {
+        try {
+          unsub();
+        } catch {}
+      });
     };
   }, []);
 
@@ -154,7 +190,12 @@ export function Web3Provider({ children }: { children: ReactNode }) {
   };
 
   const disconnect = () => {
-    setState(s => ({ ...s, account: undefined, mustConnect: true }));
+    setState(s => ({
+      ...s,
+      account: undefined,
+      chainId: undefined,
+      mustConnect: true,
+    }));
   };
 
   const getProvider = useCallback(() => {
