@@ -6,15 +6,24 @@ import { RoleProvider } from "@/contexts/RoleContext";
 import { I18nProvider } from "@/contexts/I18nContext";
 import ChainGuard from "@/components/ChainGuard";
 import ConnectBanner from "@/components/ConnectBanner";
+import ThemeController from "@/components/ThemeController";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
+        {/* Early script: apply manual dark mode before paint based on persisted preference */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var s=localStorage.getItem('color-scheme');if(s==='dark'){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}",
+          }}
+        />
         <I18nProvider>
           <Web3Provider>
             <ToastProvider>
               <RoleProvider>
+                <ThemeController />
                 <ChainGuard>
                   <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
                     <Nav />

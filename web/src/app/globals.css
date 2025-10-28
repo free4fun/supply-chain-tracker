@@ -1,10 +1,14 @@
 @import "tailwindcss";
 
+/* Bind Tailwind's dark: variant to a manual .dark class on <html> */
+@custom-variant dark (&:is(.dark &));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
 }
 
+/* Expose colors to Tailwind theme tokens */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -12,11 +16,10 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Manual dark mode variables via .dark on <html> */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 body {
@@ -37,12 +40,11 @@ body {
   align-items: flex-start;
 }
 
-@media (prefers-color-scheme: dark) {
-  body {
-    background-color: var(--background);
-    background-image:
-      radial-gradient(circle at top right, rgba(93, 102, 255, 0.22), transparent 40%),
-      radial-gradient(circle at bottom left, rgba(21, 128, 170, 0.2), transparent 52%),
-      linear-gradient(135deg, rgba(12, 14, 25, 0.92), rgba(2, 3, 10, 0.92));
-  }
+/* Dark background flourishes when .dark is present */
+.dark body {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(circle at top right, rgba(93, 102, 255, 0.22), transparent 40%),
+    radial-gradient(circle at bottom left, rgba(21, 128, 170, 0.2), transparent 52%),
+    linear-gradient(135deg, rgba(12, 14, 25, 0.92), rgba(2, 3, 10, 0.92));
 }
