@@ -102,7 +102,7 @@ function RoleWorkflowSection({
   const lastRequestedRoleLabel = lastRequestedRole ? t(`roles.${lastRequestedRole}`) : undefined;
 
   return (
-    <section className="grid gap-6 rounded-[24px] border border-slate-200/60 bg-white/80 p-8 shadow-[0_14px_45px_-32px_rgba(15,23,42,0.65)] backdrop-blur-md dark:border-slate-800/60 dark:bg-slate-900/80">
+  <section className="grid gap-6 rounded-[24px] border border-surface bg-surface-1 p-8 shadow-[0_14px_45px_-32px_rgba(15,23,42,0.65)] backdrop-blur-md">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-2">
           <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{t("landing.workflow.title")}</h2>
@@ -111,7 +111,7 @@ function RoleWorkflowSection({
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
           {t("landing.workflow.selectLabel")}
           <select
-            className="rounded-xl border border-slate-300/60 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            className="rounded-xl border border-slate-300/60 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-accent focus-outline-accent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
             value={selectedRole}
             onChange={event => setSelectedRole(event.target.value as RoleKey)}
           >
@@ -124,12 +124,12 @@ function RoleWorkflowSection({
         </label>
       </div>
 
-      <div className="grid gap-6 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
+  <div className="grid gap-6 rounded-3xl border border-surface bg-surface-2 p-6 shadow-inner">
         <div className="flex flex-col gap-2">
-          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-indigo-200/60 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-600 dark:border-indigo-500/40 dark:text-indigo-300">
+          <span className="inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold chip-soft border border-accent">
             {selectedRoleLabel}
             {isCurrentRole && (
-              <span className="rounded-full bg-indigo-600/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-indigo-100 dark:text-indigo-200">
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-accent">
                 {t("landing.workflow.currentRoleBadge")}
               </span>
             )}
@@ -147,9 +147,9 @@ function RoleWorkflowSection({
           {guide.stepKeys.map((stepKey, index) => (
             <li
               key={stepKey}
-              className="rounded-2xl border border-slate-200/70 bg-white/80 px-4 py-3 font-medium shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70"
+              className="rounded-2xl border border-surface bg-surface-3 px-4 py-3 font-medium shadow-sm hover:bg-surface-3"
             >
-              <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500/10 text-xs font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200">
+              <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold text-accent">
                 {index + 1}
               </span>
               {t(stepKey)}
@@ -164,7 +164,7 @@ function RoleWorkflowSection({
                 <Link
                   key={action.href}
                   href={action.href}
-                  className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                  className="rounded-full px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:brightness-110 btn-primary focus-outline-accent"
                 >
                   {t(action.labelKey)}
                 </Link>
@@ -242,11 +242,11 @@ export default function Page() {
 
   return (
     <main className="relative isolate mx-auto flex w-full max-w-6xl flex-col gap-10 p-6 md:p-10">
-      <div className="absolute inset-0 -z-10 overflow-hidden rounded-[32px] border border-white/20 bg-white/70 shadow-[0_40px_120px_-60px_rgba(15,23,42,0.45)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70" />
+  <div className="absolute inset-0 -z-10 overflow-hidden rounded-[32px] border border-surface bg-surface-1 shadow-[0_40px_120px_-60px_rgba(15,23,42,0.45)] backdrop-blur-xl" />
 
-      <section className="grid gap-10 rounded-[28px] border border-slate-200/60 bg-white/80 p-8 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.5)] backdrop-blur-md dark:border-slate-800/60 dark:bg-slate-900/80 md:grid-cols-[1.2fr,1fr] md:p-12">
+  <section className="grid gap-10 rounded-[28px] border border-surface bg-surface-2 p-8 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.5)] backdrop-blur-md md:grid-cols-[1.2fr,1fr] md:p-12">
         <div className="space-y-6 text-slate-900 dark:text-slate-100">
-          <span className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500/20 to-sky-500/20 px-4 py-1 text-sm font-medium text-indigo-600 dark:text-indigo-300">
+          <span className="inline-flex items-center gap-2 rounded-full px-4 py-1 text-sm font-medium chip-soft border border-accent">
             {t("landing.hero.badge")}
           </span>
           <div className="space-y-4">
@@ -259,14 +259,14 @@ export default function Page() {
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={reconnect}
-              className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+              className="rounded-full px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:brightness-110 btn-primary focus-outline-accent"
               disabled={!ready}
             >
               {account ? t("landing.hero.primary.reconnect") : t("landing.hero.primary.connect")}
             </button>
             <button
               onClick={switchAcc}
-              className="rounded-full border border-slate-300/60 px-6 py-3 text-sm font-semibold text-slate-800 transition hover:border-indigo-400 hover:text-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:text-slate-200 dark:hover:border-indigo-400"
+              className="rounded-full border border-slate-300/60 px-6 py-3 text-sm font-semibold text-slate-800 transition hover:border-accent hover:text-accent focus-outline-accent dark:border-slate-700 dark:text-slate-200"
               disabled={!ready}
             >
               {t("landing.hero.secondary")}
@@ -302,13 +302,13 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="grid gap-3 rounded-3xl border border-slate-200/60 bg-white/70 p-6 text-slate-900 shadow-inner backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/80 dark:text-slate-100">
+          <div className="grid gap-3 rounded-3xl border border-surface bg-surface-2 p-6 text-slate-900 shadow-inner backdrop-blur-sm dark:text-slate-100">
             <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">{t("landing.steps.title")}</p>
             <ol className="grid gap-3 text-sm md:text-base">
               {["landing.steps.1", "landing.steps.2", "landing.steps.3"].map(stepKey => (
                 <li
                   key={stepKey}
-                  className="rounded-2xl bg-slate-50/80 px-4 py-3 font-medium text-slate-700 dark:bg-white/5 dark:text-slate-200"
+                  className="rounded-2xl bg-surface-3 px-4 py-3 font-medium text-slate-700 hover:bg-surface-3 dark:text-slate-200"
                 >
                   {t(stepKey)}
                 </li>
@@ -330,7 +330,7 @@ export default function Page() {
         lastRequestedAt={lastRequestedAt}
       />
 
-      <section className="grid gap-4 rounded-[24px] border border-slate-200/60 bg-white/80 p-8 shadow-[0_12px_40px_-30px_rgba(15,23,42,0.7)] backdrop-blur-md dark:border-slate-800/60 dark:bg-slate-900/80">
+  <section className="grid gap-4 rounded-[24px] border border-surface bg-surface-2 p-8 shadow-[0_12px_40px_-30px_rgba(15,23,42,0.7)] backdrop-blur-md">
         <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{t("landing.features.title")}</h2>
         <div className="grid gap-6 md:grid-cols-3">
           {[
@@ -349,9 +349,9 @@ export default function Page() {
           ].map(feature => (
             <article
               key={feature.titleKey}
-              className="group rounded-3xl border border-slate-200/60 bg-white/80 p-6 transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-xl dark:border-slate-800/60 dark:bg-slate-900/80 dark:hover:border-indigo-400/70"
+              className="group rounded-3xl border border-surface bg-surface-3 p-6 transition hover:-translate-y-1 hover:border-accent hover:bg-surface-3 hover:shadow-xl"
             >
-              <h3 className="text-lg font-semibold text-slate-900 transition group-hover:text-indigo-600 dark:text-white dark:group-hover:text-indigo-300">
+              <h3 className="text-lg font-semibold text-slate-900 transition group-hover:text-accent dark:text-white">
                 {t(feature.titleKey)}
               </h3>
               <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">{t(feature.descriptionKey)}</p>

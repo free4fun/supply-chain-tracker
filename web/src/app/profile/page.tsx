@@ -174,7 +174,7 @@ export default function ProfilePage() {
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">{t("profile.title")}</h1>
 
-      <section className="space-y-3 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
+  <section className="space-y-3 rounded-3xl border border-surface bg-surface-2 p-6 shadow-inner">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("profile.status.heading")}</h2>
         <div className="grid gap-2 text-sm text-slate-700 dark:text-slate-300">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -189,10 +189,10 @@ export default function ProfilePage() {
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="font-medium text-slate-500 dark:text-slate-400">{t("profile.status.state")}</span>
-            <span className="font-semibold text-indigo-600 dark:text-indigo-300">{roleLoading ? t("profile.status.updating") : translatedStatus}</span>
+            <span className="font-semibold text-accent">{roleLoading ? t("profile.status.updating") : translatedStatus}</span>
           </div>
           {lastRequestedRole ? (
-            <div className="flex flex-col gap-2 rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-3 text-xs dark:border-slate-700 dark:bg-slate-900/70">
+            <div className="flex flex-col gap-2 rounded-2xl border border-surface bg-surface-3 px-4 py-3 text-xs">
               <span className="font-semibold text-slate-600 dark:text-slate-300">{t("profile.status.lastRequest.heading")}</span>
               <span className="font-medium text-slate-700 dark:text-slate-200">{translatedLastRequestedRole ?? lastRequestedRole}</span>
               {lastRequestText ? <span className="text-slate-500 dark:text-slate-400">{t("profile.status.lastRequest.time", { time: lastRequestText })}</span> : null}
@@ -206,13 +206,13 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      <section className="space-y-3 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
+  <section className="space-y-3 rounded-3xl border border-surface bg-surface-2 p-6 shadow-inner">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("profile.profile.heading")}</h2>
         <div className="grid gap-3 md:grid-cols-3">
           <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
             {t("profile.profile.company")}
             <input
-              className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-accent focus-outline-accent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
               value={company}
               onChange={e=>setCompany(e.target.value)}
               placeholder={t("profile.profile.companyPlaceholder")}
@@ -221,7 +221,7 @@ export default function ProfilePage() {
           <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
             {t("profile.profile.firstName")}
             <input
-              className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-accent focus-outline-accent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
               value={firstName}
               onChange={e=>setFirstName(e.target.value)}
               placeholder={t("profile.profile.firstNamePlaceholder")}
@@ -230,7 +230,7 @@ export default function ProfilePage() {
           <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
             {t("profile.profile.lastName")}
             <input
-              className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-accent focus-outline-accent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
               value={lastName}
               onChange={e=>setLastName(e.target.value)}
               placeholder={t("profile.profile.lastNamePlaceholder")}
@@ -241,21 +241,21 @@ export default function ProfilePage() {
           <button
             onClick={saveProfile}
             disabled={!account || pending}
-            className="rounded-full border border-slate-300/70 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            className="rounded-full border border-slate-300/70 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-accent focus-outline-accent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
           >
             {pending ? t("profile.profile.saving") : t("profile.profile.save")}
           </button>
         </div>
       </section>
 
-      <section className="space-y-3 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
+  <section className="space-y-3 rounded-3xl border border-surface bg-surface-2 p-6 shadow-inner">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("profile.request.heading")}</h2>
         <p className="text-sm text-slate-600 dark:text-slate-400">{t("profile.request.description")}</p>
         <form onSubmit={submit} className="flex flex-wrap items-center gap-3">
           <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
             {t("profile.request.label")}
             <select
-              className="mt-1 rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              className="mt-1 rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-accent focus-outline-accent dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
               value={role}
               onChange={event => setRole(event.target.value as (typeof ROLES)[number])}
             >
@@ -268,7 +268,7 @@ export default function ProfilePage() {
           </label>
           <button
             disabled={!account || pending}
-            className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:brightness-110 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+            className="rounded-full px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:brightness-110 disabled:opacity-60 btn-primary focus-outline-accent"
           >
             {pending ? t("profile.request.pending") : t("profile.request.submit")}
           </button>
