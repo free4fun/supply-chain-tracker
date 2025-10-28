@@ -20,9 +20,10 @@ contract SupplyChainQueriesTest is Test {
         sc.changeStatusUser(factory, SupplyChain.UserStatus.Approved);
 
         vm.prank(producer);
-        sc.createToken("L1", "Root lot", 100, "{}"); // tokenId=1
+        uint256[] memory empty = new uint256[](0);
+        sc.createToken("L1", "Root lot", 100, "{}", empty, empty); // tokenId=1
         vm.prank(producer);
-        sc.createToken("L2", "Second lot", 50, "{}"); // tokenId=2
+        sc.createToken("L2", "Second lot", 50, "{}", empty, empty); // tokenId=2
         vm.prank(producer);
         sc.transfer(factory, 1, 40); // transferId=1
         vm.prank(factory);

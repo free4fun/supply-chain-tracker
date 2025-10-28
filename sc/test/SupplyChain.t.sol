@@ -60,7 +60,8 @@ contract SupplyChainCoreTest is Test {
         _registerAndApprove(producer, "Producer");
 
         vm.prank(producer);
-        sc.createToken("Seed Lot", "Root asset", 1_000, "{}");
+        uint256[] memory empty = new uint256[](0);
+        sc.createToken("Seed Lot", "Root asset", 1_000, "{}", empty, empty);
 
         uint256 suggested = sc.getSuggestedParent(producer);
         assertEq(suggested, 0);
@@ -71,7 +72,8 @@ contract SupplyChainCoreTest is Test {
         _registerAndApprove(factory, "Factory");
 
         vm.prank(producer);
-        sc.createToken("Batch #1", "Harvest lot", 500, "{}");
+        uint256[] memory empty = new uint256[](0);
+        sc.createToken("Batch #1", "Harvest lot", 500, "{}", empty, empty);
 
         vm.prank(producer);
         sc.transfer(factory, 1, 250);
@@ -86,7 +88,11 @@ contract SupplyChainCoreTest is Test {
         _registerAndApprove(factory, "Factory");
 
         vm.prank(factory);
+        uint256[] memory ids = new uint256[](1);
+        ids[0] = 1;
+        uint256[] memory amts = new uint256[](1);
+        amts[0] = 50;
         vm.expectRevert(SupplyChain.ParentNotAssigned.selector);
-        sc.createToken("Derived", "desc", 100, "{}");
+        sc.createToken("Derived", "desc", 100, "{}", ids, amts);
     }
 }

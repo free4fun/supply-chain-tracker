@@ -60,22 +60,38 @@ export async function updateUserProfile(company: string, firstName: string, last
   await tx.wait();
 }
 
+export type ComponentInput = { tokenId: bigint; amount: bigint };
+
 export async function createToken(
   name: string,
   description: string,
   totalSupply: bigint,
-  features: string
+  features: string,
+  components: ComponentInput[]
 ): Promise<void> {
   if (!name) throw new Error("Name required");
   if (totalSupply <= BigInt(0)) throw new Error("Supply must be > 0"); // <- sin 0n
   const sc = await getContract(true);
-  const tx = await sc.createToken(name, description, totalSupply, features);
+  const ids = components.map(component => component.tokenId);
+  const amounts = components.map(component => component.amount);
+  const tx = await sc.createToken(name, description, totalSupply, features, ids, amounts);
   await tx.wait();
 }
 
 export async function getTokenView(id: number) {
   const sc = await getContract(false);
   return sc.getTokenView(id);
+}
+
+export type TokenComponent = { tokenId: number; amount: bigint };
+
+export async function getTokenInputs(tokenId: number): Promise<TokenComponent[]> {
+  const sc = await getContract(false);
+  const raw = await sc.getTokenInputs(tokenId);
+  return raw.map((entry: any) => ({
+    tokenId: Number(entry.tokenId ?? entry[0]),
+    amount: BigInt(entry.amount ?? entry[1]),
+  }));
 }
 
 export async function nextTokenId(): Promise<number> {

@@ -22,7 +22,7 @@ const items: NavItem[] = [
     href: "/tokens/create",
     labelKey: "nav.create",
     requireApproved: true,
-    roles: ["Producer", "Factory"],
+    roles: ["Producer", "Factory", "Retailer"],
     allowAdmin: true,
   },
   {
@@ -39,9 +39,10 @@ const items: NavItem[] = [
 
 export default function Nav() {
   const pathname = usePathname();
-  const { activeRole, isApproved, isAdmin } = useRole();
+  const { activeRole, isApproved, isAdmin, company, firstName, lastName } = useRole();
   const { t, lang, available, setLanguage } = useI18n();
   const allowedRole = activeRole ?? undefined;
+  const contactName = [firstName, lastName].filter(Boolean).join(" ");
 
   const tabs = items.filter(item => {
     if (item.adminOnly) return isAdmin;
@@ -77,6 +78,12 @@ export default function Nav() {
           );
         })}
         <div className="ml-auto flex items-center gap-2">
+          <div className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm dark:bg-slate-800/80 dark:text-slate-200 md:flex md:flex-col md:items-start">
+            <span>{company || t("landing.connection.role.none")}</span>
+            <span className="text-[10px] font-normal uppercase tracking-[0.35em] text-slate-400 dark:text-slate-400">
+              {contactName || t("landing.connection.role.requestAccess")}
+            </span>
+          </div>
           <button
             type="button"
             onClick={() => {

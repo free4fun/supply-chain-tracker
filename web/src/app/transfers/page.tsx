@@ -121,7 +121,10 @@ export default function TransfersPage() {
         for (const id of ids) {
           try {
             const balance = await getTokenBalance(Number(id), account);
-            options.push({ id: Number(id), balance: balance.toString() });
+            const asBigInt = BigInt(balance);
+            if (asBigInt > 0n) {
+              options.push({ id: Number(id), balance: asBigInt.toString() });
+            }
           } catch (err) {
             console.error(err);
           }
