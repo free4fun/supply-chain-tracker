@@ -6,6 +6,14 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Layered surface system (light) */
+  --surface-1: #ffffff;
+  --surface-2: #f8fafc; /* slate-50-ish */
+  --surface-3: #eff4f9; /* soft blue tint */
+  --surface-1-hover: #f8fafc;
+  --surface-2-hover: #f1f5f9;
+  --surface-3-hover: #e9f0f7;
+  --border: rgba(15, 23, 42, 0.12);
 }
 
 /* Expose colors to Tailwind theme tokens */
@@ -20,6 +28,14 @@
 .dark {
   --background: #0a0a0a;
   --foreground: #ededed;
+  /* Layered surface system (dark) */
+  --surface-1: rgba(15, 23, 42, 0.92);
+  --surface-2: rgba(18, 27, 45, 0.90);
+  --surface-3: rgba(22, 31, 50, 0.88);
+  --surface-1-hover: rgba(15, 23, 42, 0.96);
+  --surface-2-hover: rgba(18, 27, 45, 0.94);
+  --surface-3-hover: rgba(22, 31, 50, 0.92);
+  --border: rgba(226, 232, 240, 0.18);
 }
 
 body {
@@ -47,4 +63,37 @@ body {
     radial-gradient(circle at top right, rgba(93, 102, 255, 0.22), transparent 40%),
     radial-gradient(circle at bottom left, rgba(21, 128, 170, 0.2), transparent 52%),
     linear-gradient(135deg, rgba(12, 14, 25, 0.92), rgba(2, 3, 10, 0.92));
+}
+
+/* Theme accents per role (applied by ThemeController on <body>) */
+body.theme-none { --accent: #6366f1; --accent-2: #0ea5e9; }
+body.theme-producer { --accent: #10b981; --accent-2: #34d399; }
+body.theme-factory { --accent: #7c3aed; --accent-2: #6366f1; }
+body.theme-retailer { --accent: #f59e0b; --accent-2: #f97316; }
+body.theme-consumer { --accent: #06b6d4; --accent-2: #0ea5e9; }
+body.theme-admin { --accent: #ef4444; --accent-2: #f43f5e; }
+
+/* Utility classes for surfaces and accents */
+.bg-surface-1 { background-color: var(--surface-1); }
+.bg-surface-2 { background-color: var(--surface-2); }
+.bg-surface-3 { background-color: var(--surface-3); }
+.border-surface { border-color: var(--border); }
+
+.hover\:bg-surface-1:hover { background-color: var(--surface-1-hover); }
+.hover\:bg-surface-2:hover { background-color: var(--surface-2-hover); }
+.hover\:bg-surface-3:hover { background-color: var(--surface-3-hover); }
+
+.text-accent { color: var(--accent); }
+.hover\:text-accent:hover { color: var(--accent); }
+.border-accent { border-color: var(--accent); }
+.hover\:border-accent:hover { border-color: var(--accent); }
+
+.btn-primary {
+  background-image: linear-gradient(to right, var(--accent), var(--accent-2));
+  color: #fff;
+}
+
+.focus-outline-accent:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

@@ -102,7 +102,7 @@ function RoleWorkflowSection({
   const lastRequestedRoleLabel = lastRequestedRole ? t(`roles.${lastRequestedRole}`) : undefined;
 
   return (
-    <section className="grid gap-6 rounded-[24px] border border-slate-200/60 bg-white/80 p-8 shadow-[0_14px_45px_-32px_rgba(15,23,42,0.65)] backdrop-blur-md dark:border-slate-800/60 dark:bg-slate-900/80">
+  <section className="grid gap-6 rounded-[24px] border border-surface bg-surface-1 p-8 shadow-[0_14px_45px_-32px_rgba(15,23,42,0.65)] backdrop-blur-md">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-2">
           <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{t("landing.workflow.title")}</h2>
@@ -124,7 +124,7 @@ function RoleWorkflowSection({
         </label>
       </div>
 
-      <div className="grid gap-6 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
+  <div className="grid gap-6 rounded-3xl border border-surface bg-surface-1 p-6 shadow-inner">
         <div className="flex flex-col gap-2">
           <span className="inline-flex w-fit items-center gap-2 rounded-full border border-indigo-200/60 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-600 dark:border-indigo-500/40 dark:text-indigo-300">
             {selectedRoleLabel}
@@ -147,7 +147,7 @@ function RoleWorkflowSection({
           {guide.stepKeys.map((stepKey, index) => (
             <li
               key={stepKey}
-              className="rounded-2xl border border-slate-200/70 bg-white/80 px-4 py-3 font-medium shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70"
+              className="rounded-2xl border border-surface bg-surface-2 px-4 py-3 font-medium shadow-sm hover:bg-surface-3"
             >
               <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500/10 text-xs font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200">
                 {index + 1}
@@ -244,7 +244,7 @@ export default function Page() {
     <main className="relative isolate mx-auto flex w-full max-w-6xl flex-col gap-10 p-6 md:p-10">
       <div className="absolute inset-0 -z-10 overflow-hidden rounded-[32px] border border-white/20 bg-white/70 shadow-[0_40px_120px_-60px_rgba(15,23,42,0.45)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70" />
 
-      <section className="grid gap-10 rounded-[28px] border border-slate-200/60 bg-white/80 p-8 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.5)] backdrop-blur-md dark:border-slate-800/60 dark:bg-slate-900/80 md:grid-cols-[1.2fr,1fr] md:p-12">
+  <section className="grid gap-10 rounded-[28px] border border-surface bg-surface-1 p-8 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.5)] backdrop-blur-md md:grid-cols-[1.2fr,1fr] md:p-12">
         <div className="space-y-6 text-slate-900 dark:text-slate-100">
           <span className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500/20 to-sky-500/20 px-4 py-1 text-sm font-medium text-indigo-600 dark:text-indigo-300">
             {t("landing.hero.badge")}
@@ -302,13 +302,13 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="grid gap-3 rounded-3xl border border-slate-200/60 bg-white/70 p-6 text-slate-900 shadow-inner backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/80 dark:text-slate-100">
+          <div className="grid gap-3 rounded-3xl border border-surface bg-surface-2 p-6 text-slate-900 shadow-inner backdrop-blur-sm dark:text-slate-100">
             <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">{t("landing.steps.title")}</p>
             <ol className="grid gap-3 text-sm md:text-base">
               {["landing.steps.1", "landing.steps.2", "landing.steps.3"].map(stepKey => (
                 <li
                   key={stepKey}
-                  className="rounded-2xl bg-slate-50/80 px-4 py-3 font-medium text-slate-700 dark:bg-white/5 dark:text-slate-200"
+                  className="rounded-2xl bg-surface-2 px-4 py-3 font-medium text-slate-700 hover:bg-surface-3 dark:text-slate-200"
                 >
                   {t(stepKey)}
                 </li>
@@ -330,7 +330,7 @@ export default function Page() {
         lastRequestedAt={lastRequestedAt}
       />
 
-      <section className="grid gap-4 rounded-[24px] border border-slate-200/60 bg-white/80 p-8 shadow-[0_12px_40px_-30px_rgba(15,23,42,0.7)] backdrop-blur-md dark:border-slate-800/60 dark:bg-slate-900/80">
+      <section className="grid gap-4 rounded-[24px] border border-surface bg-surface-1 p-8 shadow-[0_12px_40px_-30px_rgba(15,23,42,0.7)] backdrop-blur-md">
         <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{t("landing.features.title")}</h2>
         <div className="grid gap-6 md:grid-cols-3">
           {[
@@ -349,7 +349,7 @@ export default function Page() {
           ].map(feature => (
             <article
               key={feature.titleKey}
-              className="group rounded-3xl border border-slate-200/60 bg-white/80 p-6 transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-xl dark:border-slate-800/60 dark:bg-slate-900/80 dark:hover:border-indigo-400/70"
+              className="group rounded-3xl border border-surface bg-surface-2 p-6 transition hover:-translate-y-1 hover:bg-surface-3 hover:border-accent hover:shadow-xl"
             >
               <h3 className="text-lg font-semibold text-slate-900 transition group-hover:text-indigo-600 dark:text-white dark:group-hover:text-indigo-300">
                 {t(feature.titleKey)}

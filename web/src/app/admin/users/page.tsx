@@ -83,14 +83,14 @@ export default function AdminUsersPage() {
             </div>
         </div>
 
-        <div className="divide-y border-t border-b">
+        <div className="divide-y border-t border-b border-surface">
             {data.length===0 && <p className="text-sm p-2">{t("admin.users.empty")}</p>}
             {data.map(r => (
-            <div key={r.id} className="p-4 space-y-3">
+            <div key={r.id} className="p-4 space-y-3 bg-surface-1 rounded-2xl border border-surface">
                 <div className="grid grid-cols-12 gap-3 items-start text-sm">
                     <div className="col-span-4 space-y-1">
                         <div className="font-medium text-slate-500 dark:text-slate-400 text-xs">{t("admin.users.headers.address")}</div>
-                        <div className="break-all font-mono text-xs bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded">{r.addr}</div>
+                        <div className="break-all font-mono text-xs bg-surface-2 px-2 py-1 rounded">{r.addr}</div>
                     </div>
                     <div className="col-span-2 space-y-1">
                         <div className="font-medium text-slate-500 dark:text-slate-400 text-xs">{t("admin.users.headers.role")}</div>

@@ -248,7 +248,7 @@ export default function TransfersPage() {
 
   return (
     <div className="space-y-8">
-      <section className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
+      <section className="space-y-4 rounded-3xl border border-surface bg-surface-1 p-6 shadow-inner">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold text-slate-900 dark:text-white">{t("transfers.title")}</h1>
           {nextRole ? (
@@ -265,7 +265,7 @@ export default function TransfersPage() {
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
               {t("transfers.form.token")}
               <select
-                className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                className="mt-1 w-full rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:text-slate-200"
                 value={selectedToken}
                 onChange={event => setSelectedToken(event.target.value)}
               >
@@ -283,7 +283,7 @@ export default function TransfersPage() {
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
               {t("transfers.form.amount")}
               <input
-                className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                className="mt-1 w-full rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm text-slate-800 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:text-slate-200"
                 value={amount}
                 onChange={event => setAmount(event.target.value)}
                 placeholder={t("transfers.form.amountPlaceholder")}
@@ -295,7 +295,7 @@ export default function TransfersPage() {
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300 md:col-span-2">
               {t("transfers.form.recipient")}
               <select
-                className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                className="mt-1 w-full rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:text-slate-200"
                 value={selectedRecipient}
                 onChange={event => setSelectedRecipient(event.target.value)}
               >
@@ -317,7 +317,7 @@ export default function TransfersPage() {
 
             {selectedRecipient === "__custom" ? (
               <input
-                className="md:col-span-2 rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                className="md:col-span-2 rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm text-slate-800 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:text-slate-200"
                 value={customRecipient}
                 onChange={event => setCustomRecipient(event.target.value)}
                 placeholder="0x..."
@@ -338,13 +338,13 @@ export default function TransfersPage() {
         )}
       </section>
 
-      <section className="space-y-3 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
+  <section className="space-y-3 rounded-3xl border border-surface bg-surface-1 p-6 shadow-inner">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("transfers.incoming.title")}</h2>
           <button
             onClick={() => refreshTransfers()}
             disabled={loadingTransfers}
-            className="rounded-full border border-slate-300/70 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200"
+            className="rounded-full border border-surface px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-accent hover:text-accent disabled:opacity-60 dark:text-slate-200"
           >
             {loadingTransfers ? t("transfers.refreshing") : t("transfers.refresh")}
           </button>
@@ -354,7 +354,7 @@ export default function TransfersPage() {
           {incoming.map(row => (
             <div
               key={row.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-surface bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3"
             >
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("transfers.incoming.rowTitle", { id: row.id, token: row.tokenId, amount: row.amount })}</p>
@@ -363,7 +363,7 @@ export default function TransfersPage() {
               </div>
               <div className="flex gap-2">
                 <button
-                  className="rounded-full border border-slate-300/70 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-green-400 hover:text-green-600 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200"
+                  className="rounded-full border border-surface px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-green-400 hover:text-green-600 disabled:opacity-60 dark:text-slate-200"
                   onClick={async () => {
                     try {
                       await acceptTransfer(BigInt(row.id));
@@ -379,7 +379,7 @@ export default function TransfersPage() {
                   {t("transfers.actions.accept")}
                 </button>
                 <button
-                  className="rounded-full border border-slate-300/70 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-rose-400 hover:text-rose-600 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200"
+                  className="rounded-full border border-surface px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-rose-400 hover:text-rose-600 disabled:opacity-60 dark:text-slate-200"
                   onClick={async () => {
                     try {
                       await rejectTransfer(BigInt(row.id));
@@ -400,14 +400,14 @@ export default function TransfersPage() {
         </div>
       </section>
 
-      <section className="space-y-3 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
+  <section className="space-y-3 rounded-3xl border border-surface bg-surface-1 p-6 shadow-inner">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("transfers.outgoing.title")}</h2>
         <div className="grid gap-3">
           {outgoing.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">{t("transfers.outgoing.empty")}</p> : null}
           {outgoing.map(row => (
             <div
               key={row.id}
-              className="rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+              className="rounded-2xl border border-surface bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3"
             >
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("transfers.outgoing.rowTitle", { id: row.id, token: row.tokenId, amount: row.amount })}</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">{t("transfers.outgoing.to", { address: row.to })}</p>
