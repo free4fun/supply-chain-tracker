@@ -13,10 +13,10 @@ contract SupplyChainQueriesTest is Test {
     function setUp() public {
         sc = new SupplyChain();
         vm.prank(producer);
-        sc.requestUserRole("Producer");
+        sc.registerAndRequestRole("Producer Co", "Test", "User", "Producer");
         sc.changeStatusUser(producer, SupplyChain.UserStatus.Approved);
         vm.prank(factory);
-        sc.requestUserRole("Factory");
+        sc.registerAndRequestRole("Factory Inc", "Test", "User", "Factory");
         sc.changeStatusUser(factory, SupplyChain.UserStatus.Approved);
 
         vm.prank(producer);

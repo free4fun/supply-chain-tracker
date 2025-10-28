@@ -22,19 +22,19 @@ contract SupplyChainTransfersTest is Test {
 
         // Register and approve roles
         vm.prank(producer);
-        sc.requestUserRole("Producer");
+        sc.registerAndRequestRole("Producer Co", "Test", "User", "Producer");
         sc.changeStatusUser(producer, SupplyChain.UserStatus.Approved);
 
         vm.prank(factory);
-        sc.requestUserRole("Factory");
+        sc.registerAndRequestRole("Factory Inc", "Test", "User", "Factory");
         sc.changeStatusUser(factory, SupplyChain.UserStatus.Approved);
 
         vm.prank(retailer);
-        sc.requestUserRole("Retailer");
+        sc.registerAndRequestRole("Retail Corp", "Test", "User", "Retailer");
         sc.changeStatusUser(retailer, SupplyChain.UserStatus.Approved);
 
         vm.prank(consumer);
-        sc.requestUserRole("Consumer");
+        sc.registerAndRequestRole("Consumer LLC", "Test", "User", "Consumer");
         sc.changeStatusUser(consumer, SupplyChain.UserStatus.Approved);
 
         // Producer mints root token with full balance
@@ -156,11 +156,12 @@ contract SupplyChainTransfersTest is Test {
     }
 
     function test_onlyApprovedSender_canTransfer() public {
-        // Put producer back to Pending
-        vm.prank(producer);
-        sc.requestUserRole("Producer"); // status -> Pending
+        // Register a new unapproved user
+        vm.prank(rando);
+        sc.registerAndRequestRole("Rando Co", "Test", "User", "Producer");
+        // rando is now Pending (not Approved)
 
-        vm.prank(producer);
+        vm.prank(rando);
         vm.expectRevert();
         sc.transfer(factory, tokenId, 10);
     }

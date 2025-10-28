@@ -19,7 +19,7 @@ contract SupplyChainCoreTest is Test {
 
     function _registerAndApprove(address who, string memory role) internal {
         vm.prank(who);
-        sc.requestUserRole(role);
+        sc.registerAndRequestRole("Test Company", "Test", "User", role);
         sc.changeStatusUser(who, SupplyChain.UserStatus.Approved);
     }
 
@@ -30,17 +30,17 @@ contract SupplyChainCoreTest is Test {
 
     function testRequestUserRoleStoresPendingStatus() public {
         vm.prank(producer);
-        sc.requestUserRole("Producer");
+        sc.registerAndRequestRole("Producer Co", "John", "Doe", "Producer");
 
         SupplyChain.User memory u = sc.getUserInfo(producer);
         assertEq(u.userAddress, producer);
-        assertEq(u.role, "Producer");
+        assertEq(u.pendingRole, "Producer");
         assertEq(uint256(u.status), uint256(SupplyChain.UserStatus.Pending));
     }
 
     function testStatusLockPreventsReapproval() public {
         vm.prank(factory);
-        sc.requestUserRole("Factory");
+        sc.registerAndRequestRole("Factory Inc", "Jane", "Smith", "Factory");
         sc.changeStatusUser(factory, SupplyChain.UserStatus.Rejected);
 
         vm.expectRevert(SupplyChain.StatusLocked.selector);
@@ -49,7 +49,7 @@ contract SupplyChainCoreTest is Test {
 
     function testStatusLockAllowsIdempotentUpdate() public {
         vm.prank(retailer);
-        sc.requestUserRole("Retailer");
+        sc.registerAndRequestRole("Retail Corp", "Bob", "Jones", "Retailer");
         sc.changeStatusUser(retailer, SupplyChain.UserStatus.Approved);
 
         // Same status should be allowed (no-op)

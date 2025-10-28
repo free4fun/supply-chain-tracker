@@ -25,6 +25,10 @@ type Snapshot = {
   isRegistered: boolean;
   isApproved: boolean;
   activeRole?: string;
+  pendingRole?: string;
+  company?: string;
+  firstName?: string;
+  lastName?: string;
   lastRequestedRole?: string;
   lastRequestedAt?: number;
   isAdmin: boolean;
@@ -120,11 +124,20 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     let status: number | undefined;
     let isRegistered = false;
     let isApproved = false;
+    let pendingRole: string | undefined;
+    let company: string | undefined;
+    let firstName: string | undefined;
+    let lastName: string | undefined;
 
     try {
       const info = await getUserInfo(account);
+      // getUserInfo returns tuple: [id, userAddress, role, pendingRole, status, company, firstName, lastName]
       role = String(info[2]);
-      status = Number(info[3]);
+      pendingRole = String(info[3] || "");
+      status = Number(info[4]);
+      company = info[5] ? String(info[5]) : undefined;
+      firstName = info[6] ? String(info[6]) : undefined;
+      lastName = info[7] ? String(info[7]) : undefined;
       isRegistered = true;
       isApproved = status === 1;
     } catch {
@@ -141,7 +154,9 @@ export function RoleProvider({ children }: { children: ReactNode }) {
           ? `#${status}`
           : undefined;
 
-    const { role: lastRole, timestamp } = await readLastRequest(account);
+    const { role: lastRoleEvt, timestamp } = await readLastRequest(account);
+    // Prefer on-chain pendingRole if present; fallback to last event for display
+    const lastRole = pendingRole && pendingRole.length > 0 ? pendingRole : lastRoleEvt;
 
     return {
       role,
@@ -150,6 +165,10 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       isRegistered,
       isApproved,
       activeRole: isApproved ? role : undefined,
+      pendingRole,
+      company,
+      firstName,
+      lastName,
       lastRequestedRole: lastRole,
       lastRequestedAt: timestamp,
       isAdmin: currentAdmin ? lowerAccount === currentAdmin : false,

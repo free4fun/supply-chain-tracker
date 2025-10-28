@@ -28,8 +28,13 @@ contract SupplyChain {
     struct User {
         uint256 id;
         address userAddress;
-        string role; // "Producer" | "Factory" | "Retailer" | "Consumer"
+        string role; // Active role: "Producer" | "Factory" | "Retailer" | "Consumer"
+        string pendingRole; // Requested role while under review (empty if none)
         UserStatus status;
+        // Profile fields
+        string company;
+        string firstName;
+        string lastName;
     }
 
     struct Token {
@@ -85,6 +90,7 @@ contract SupplyChain {
     // ---------- Events ----------
     event UserRoleRequested(address indexed user, string role);
     event UserStatusChanged(address indexed user, UserStatus status);
+    event UserProfileUpdated(address indexed user, string company, string firstName, string lastName);
     event TokenCreated(
         uint256 indexed tokenId,
         address indexed creator,
@@ -223,32 +229,140 @@ contract SupplyChain {
     }
 
     // ---------- User management ----------
-    function requestUserRole(string memory role) external {
+    function requestUserRole(string memory role) external { // Mejorar funcion de testeo
         if (bytes(role).length == 0) revert EmptyRole();
 
         uint256 id = addressToUserId[msg.sender];
         if (id == 0) {
-            id = nextUserId++;
-            addressToUserId[msg.sender] = id;
-            users[id] =
-                User({ id: id, userAddress: msg.sender, role: role, status: UserStatus.Pending });
+            // New user without profile: enforce initial registration via registerAndRequestRole
+            revert NoUser();
         } else {
             User storage u = users[id];
-            u.role = role;
-            u.status = UserStatus.Pending;
+            if (u.status == UserStatus.Approved) {
+                // Keep active role until admin approves; just set pendingRole
+                u.pendingRole = role;
+            } else {
+                // Onboarding flow: keep status Pending and stage role
+                u.pendingRole = role;
+                u.status = UserStatus.Pending;
+            }
         }
         emit UserRoleRequested(msg.sender, role);
     }
 
-    function changeStatusUser(address userAddress, UserStatus newStatus) external onlyAdmin {
+    /// @notice First-time registration: set profile and request a role in a single transaction.
+    function registerAndRequestRole(
+        string memory company,
+        string memory firstName,
+        string memory lastName,
+        string memory role
+    ) external {
+        require(bytes(company).length != 0, "Company required");
+        require(bytes(firstName).length != 0, "First name required");
+        require(bytes(lastName).length != 0, "Last name required");
+        if (bytes(role).length == 0) revert EmptyRole();
+
+        uint256 id = addressToUserId[msg.sender];
+        require(id == 0, "Already registered");
+
+        id = nextUserId++;
+        addressToUserId[msg.sender] = id;
+        users[id] = User({
+            id: id,
+            userAddress: msg.sender,
+            role: "",
+            pendingRole: role,
+            status: UserStatus.Pending,
+            company: company,
+            firstName: firstName,
+            lastName: lastName
+        });
+
+        emit UserProfileUpdated(msg.sender, company, firstName, lastName);
+        emit UserRoleRequested(msg.sender, role);
+    }
+
+    /// @notice Update user profile fields; caller must be registered.
+    function updateUserProfile(
+        string memory company,
+        string memory firstName,
+        string memory lastName
+    ) external {
+        uint256 id = addressToUserId[msg.sender];
+        require(id != 0, "User not found");
+
+        require(bytes(company).length != 0, "Company required");
+        require(bytes(firstName).length != 0, "First name required");
+        require(bytes(lastName).length != 0, "Last name required");
+
+        User storage u = users[id];
+        u.company = company;
+        u.firstName = firstName;
+        u.lastName = lastName;
+
+        emit UserProfileUpdated(msg.sender, company, firstName, lastName);
+    }
+
+    function changeStatusUser(address userAddress, UserStatus newStatus) external onlyAdmin { // Mejorar funcion de testeo
         uint256 uid = addressToUserId[userAddress];
         require(uid != 0, "User not found");
         User storage u = users[uid];
-        if (u.status != UserStatus.Pending && u.status != newStatus) {
-            revert StatusLocked();
+
+        bool hasPending = bytes(u.pendingRole).length != 0;
+        if (!hasPending) {
+            // No staged change: only allow transitions when Pending or idempotent
+            if (u.status != UserStatus.Pending && u.status != newStatus) {
+                revert StatusLocked();
+            }
+            u.status = newStatus;
+        } else {
+            if (newStatus == UserStatus.Approved) {
+                // Apply requested role and keep Approved status
+                u.role = u.pendingRole;
+                u.pendingRole = "";
+                u.status = UserStatus.Approved;
+            } else if (newStatus == UserStatus.Rejected) {
+                // Drop request; keep current active role
+                u.pendingRole = "";
+                if (u.status != UserStatus.Approved) {
+                    u.status = UserStatus.Rejected;
+                }
+            } else if (newStatus == UserStatus.Canceled) {
+                // Treat as dropping the request (admin shouldn't cancel usually)
+                u.pendingRole = "";
+                if (u.status != UserStatus.Approved) {
+                    u.status = UserStatus.Canceled;
+                }
+            } else if (newStatus == UserStatus.Pending) {
+                // no-op
+            } else {
+                revert("Invalid status");
+            }
         }
-        u.status = newStatus;
+
         emit UserStatusChanged(userAddress, newStatus);
+    }
+
+    function cancelRoleRequest() external { // Necesita funcion de testeo
+        uint256 uid = addressToUserId[msg.sender];
+        require(uid != 0, "User not found");
+        User storage u = users[uid];
+
+        bool hasPending = bytes(u.pendingRole).length != 0;
+        require(hasPending || u.status == UserStatus.Pending, "No role request pending");
+
+        if (hasPending && u.status == UserStatus.Approved) {
+            // Approved user cancels their pending change: keep active role as-is
+            u.pendingRole = "";
+            emit UserStatusChanged(msg.sender, u.status);
+            return;
+        }
+
+        // Onboarding user cancels while Pending
+        require(u.status == UserStatus.Pending, "Not pending");
+        u.pendingRole = "";
+        u.status = UserStatus.Canceled;
+        emit UserStatusChanged(msg.sender, u.status);
     }
 
     // ---------- Token creation ----------

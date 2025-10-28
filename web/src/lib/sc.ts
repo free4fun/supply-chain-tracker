@@ -4,8 +4,18 @@
 import { getContract } from "@/lib/web3";
 import type { Provider, EventLog } from "ethers";
 
-export type UserView = { id: number; addr: string; role: string; status: number };
+export type UserView = {
+  id: number;
+  addr: string;
+  role: string;
+  pendingRole?: string;
+  status: number;
+  company?: string;
+  firstName?: string;
+  lastName?: string;
+};
 export type RoleReq = { user: string; role: string; blockNumber: number; txHash: string; timestamp?: number };
+
 export async function scAdmin(): Promise<string> {
   const sc = await getContract(false);
   return sc.admin();
@@ -23,9 +33,30 @@ export async function requestUserRole(role: string): Promise<void> {
   await tx.wait();
 }
 
+export async function registerAndRequestRole(company: string, firstName: string, lastName: string, role: string): Promise<void> {
+  if (!company || !firstName || !lastName) throw new Error("Profile required");
+  if (!role) throw new Error("Role required");
+  const sc = await getContract(true);
+  const tx = await sc.registerAndRequestRole(company, firstName, lastName, role);
+  await tx.wait();
+}
+
 export async function changeStatusUser(addr: string, newStatus: number): Promise<void> {
   const sc = await getContract(true);
   const tx = await sc.changeStatusUser(addr, newStatus);
+  await tx.wait();
+}
+
+export async function cancelRoleRequest(): Promise<void> {
+  const sc = await getContract(true);
+  const tx = await sc.cancelRoleRequest();
+  await tx.wait();
+}
+
+export async function updateUserProfile(company: string, firstName: string, lastName: string): Promise<void> {
+  if (!company || !firstName || !lastName) throw new Error("Profile required");
+  const sc = await getContract(true);
+  const tx = await sc.updateUserProfile(company, firstName, lastName);
   await tx.wait();
 }
 
@@ -105,7 +136,17 @@ export async function nextUserId(): Promise<number> {
 export async function getUserById(id: number): Promise<UserView> {
   const sc = await getContract(false);
   const u = await sc.users(id);
-  return { id: Number(u[0]), addr: u[1], role: u[2], status: Number(u[3]) };
+  // users mapping returns: [id, userAddress, role, pendingRole, status]
+  return {
+    id: Number(u[0]),
+    addr: u[1],
+    role: u[2],
+    pendingRole: u[3],
+    status: Number(u[4]),
+    company: u[5],
+    firstName: u[6],
+    lastName: u[7],
+  };
 }
 
 export async function listUsers(): Promise<UserView[]> {
@@ -142,7 +183,6 @@ export async function getAllRoleRequests(): Promise<RoleReq[]> {
   }
   return reqs;
 }
-
 
 export async function lastRoleRequestByUser(): Promise<Record<string, RoleReq>> {
   // Reduce to last request per address (highest blockNumber)

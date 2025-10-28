@@ -16,15 +16,15 @@ contract SupplyChainTokensTest is Test {
         sc = new SupplyChain();
 
         vm.prank(producer);
-        sc.requestUserRole("Producer");
+        sc.registerAndRequestRole("Producer Co", "Test", "User", "Producer");
         sc.changeStatusUser(producer, SupplyChain.UserStatus.Approved);
 
         vm.prank(factory);
-        sc.requestUserRole("Factory");
+        sc.registerAndRequestRole("Factory Inc", "Test", "User", "Factory");
         sc.changeStatusUser(factory, SupplyChain.UserStatus.Approved);
 
         vm.prank(retailer);
-        sc.requestUserRole("Retailer");
+        sc.registerAndRequestRole("Retail Corp", "Test", "User", "Retailer");
         sc.changeStatusUser(retailer, SupplyChain.UserStatus.Approved);
     }
 

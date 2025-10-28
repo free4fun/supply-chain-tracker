@@ -51,6 +51,13 @@
   },
   {
     "type": "function",
+    "name": "cancelRoleRequest",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "changeStatusUser",
     "inputs": [
       {
@@ -273,9 +280,29 @@
             "internalType": "string"
           },
           {
+            "name": "pendingRole",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
             "name": "status",
             "type": "uint8",
             "internalType": "enum SupplyChain.UserStatus"
+          },
+          {
+            "name": "company",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "firstName",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "lastName",
+            "type": "string",
+            "internalType": "string"
           }
         ]
       }
@@ -377,6 +404,34 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "registerAndRequestRole",
+    "inputs": [
+      {
+        "name": "company",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "firstName",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "lastName",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "role",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -532,6 +587,29 @@
   },
   {
     "type": "function",
+    "name": "updateUserProfile",
+    "inputs": [
+      {
+        "name": "company",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "firstName",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "lastName",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "users",
     "inputs": [
       {
@@ -557,9 +635,29 @@
         "internalType": "string"
       },
       {
+        "name": "pendingRole",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
         "name": "status",
         "type": "uint8",
         "internalType": "enum SupplyChain.UserStatus"
+      },
+      {
+        "name": "company",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "firstName",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "lastName",
+        "type": "string",
+        "internalType": "string"
       }
     ],
     "stateMutability": "view"
@@ -678,6 +776,37 @@
   },
   {
     "type": "event",
+    "name": "UserProfileUpdated",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "company",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "firstName",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "lastName",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "UserRoleRequested",
     "inputs": [
       {
@@ -717,6 +846,11 @@
   {
     "type": "error",
     "name": "EmptyRole",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NoUser",
     "inputs": []
   },
   {

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
-import { requestUserRole } from "@/lib/sc";
+import { requestUserRole, cancelRoleRequest, registerAndRequestRole, updateUserProfile } from "@/lib/sc";
 import { useToast } from "@/contexts/ToastContext";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { useRole } from "@/contexts/RoleContext";
@@ -18,13 +18,16 @@ enum ToastKind {
 
 export default function ProfilePage() {
   const { t } = useI18n();
-  const { activeRole, statusLabel, isRegistered, isApproved, lastRequestedRole, lastRequestedAt, refresh, loading: roleLoading, isAdmin } = useRole();
+  const { activeRole, statusLabel, isRegistered, isApproved, lastRequestedRole, lastRequestedAt, pendingRole, company: companySnap, firstName: firstNameSnap, lastName: lastNameSnap, refresh, loading: roleLoading, isAdmin } = useRole();
   const initialRole = useMemo<(typeof ROLES)[number]>(() => {
     const candidate = (activeRole || lastRequestedRole) as (typeof ROLES)[number] | undefined;
     return candidate && ROLES.includes(candidate) ? candidate : "Producer";
   }, [activeRole, lastRequestedRole]);
   const [role, setRole] = useState<(typeof ROLES)[number]>(initialRole);
   const [pending, setPending] = useState(false);
+  const [company, setCompany] = useState<string>(companySnap || "");
+  const [firstName, setFirstName] = useState<string>(firstNameSnap || "");
+  const [lastName, setLastName] = useState<string>(lastNameSnap || "");
 
   const { push } = useToast();
   // Expecting these from Web3Context; if not present, only `account` is used.
@@ -35,7 +38,10 @@ export default function ProfilePage() {
     if (candidate && ROLES.includes(candidate)) {
       setRole(candidate);
     }
-  }, [activeRole, lastRequestedRole]);
+    setCompany(companySnap || "");
+    setFirstName(firstNameSnap || "");
+    setLastName(lastNameSnap || "");
+  }, [activeRole, lastRequestedRole, companySnap, firstNameSnap, lastNameSnap]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -48,10 +54,90 @@ export default function ProfilePage() {
       push(ToastKind.Error, t("profile.toast.connectWallet"));
       return;
     }
+    if (isApproved && activeRole && parsed.data.role === activeRole) {
+      push(ToastKind.Error, t("profile.request.sameAsCurrent"));
+      return;
+    }
     try {
       setPending(true);
-      await requestUserRole(parsed.data.role);
+      // Try-catch around the actual contract call to detect if user needs registration
+      try {
+        if (!isRegistered) {
+          // First-time registration requires profile
+          if (!company || !firstName || !lastName) {
+            push(ToastKind.Error, t("profile.request.profileRequired"));
+            setPending(false);
+            return;
+          }
+          await registerAndRequestRole(company, firstName, lastName, parsed.data.role);
+        } else {
+          await requestUserRole(parsed.data.role);
+        }
+      } catch (innerErr: unknown) {
+        // If we get NoUser error, it means we need to use registerAndRequestRole
+        const innerMsg = innerErr instanceof Error ? innerErr.message : "";
+        if (innerMsg.includes("NoUser") || innerMsg.includes("User not found")) {
+          if (!company || !firstName || !lastName) {
+            push(ToastKind.Error, t("profile.request.profileRequired"));
+            setPending(false);
+            return;
+          }
+          await registerAndRequestRole(company, firstName, lastName, parsed.data.role);
+        } else {
+          throw innerErr;
+        }
+      }
       push(ToastKind.Success, t("profile.toast.success"));
+      await refresh();
+    } catch (err: unknown) {
+      let message = err instanceof Error ? err.message : t("profile.toast.failure");
+      if (message.includes("CALL_EXCEPTION") || message.includes("execution reverted")) {
+        message = t("profile.toast.contractOutdated");
+      }
+      push(ToastKind.Error, message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function saveProfile() {
+    if (!account) {
+      push(ToastKind.Error, t("profile.toast.connectWallet"));
+      return;
+    }
+    if (!isRegistered) {
+      push(ToastKind.Error, t("profile.profile.notRegistered"));
+      return;
+    }
+    if (!company || !firstName || !lastName) {
+      push(ToastKind.Error, t("profile.request.profileRequired"));
+      return;
+    }
+    try {
+      setPending(true);
+      await updateUserProfile(company, firstName, lastName);
+      push(ToastKind.Success, t("profile.profile.saved"));
+      await refresh();
+    } catch (err: unknown) {
+      let message = err instanceof Error ? err.message : t("profile.toast.failure");
+      if (message.includes("CALL_EXCEPTION") || message.includes("execution reverted")) {
+        message = t("profile.toast.contractOutdated");
+      }
+      push(ToastKind.Error, message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function cancelRequest() {
+    if (!account) {
+      push(ToastKind.Error, t("profile.toast.connectWallet"));
+      return;
+    }
+    try {
+      setPending(true);
+      await cancelRoleRequest();
+      push(ToastKind.Success, t("profile.toast.cancelSuccess"));
       await refresh();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t("profile.toast.failure");
@@ -82,6 +168,7 @@ export default function ProfilePage() {
   const translatedRole = activeRole ? t(`roles.${activeRole}`) : isAdmin ? t("roles.Admin") : isRegistered ? t("profile.status.unassigned") : t("common.status.none");
   const translatedStatus = statusLabel ? translateStatus(statusLabel, t) : t("common.status.none");
   const translatedLastRequestedRole = lastRequestedRole ? t(`roles.${lastRequestedRole}`) : undefined;
+  const showCancel = !!pendingRole && (!isApproved || pendingRole !== activeRole);
 
   return (
     <div className="space-y-6">
@@ -105,12 +192,59 @@ export default function ProfilePage() {
             <span className="font-semibold text-indigo-600 dark:text-indigo-300">{roleLoading ? t("profile.status.updating") : translatedStatus}</span>
           </div>
           {lastRequestedRole ? (
-            <div className="flex flex-col gap-0.5 rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-3 text-xs dark:border-slate-700 dark:bg-slate-900/70">
+            <div className="flex flex-col gap-2 rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-3 text-xs dark:border-slate-700 dark:bg-slate-900/70">
               <span className="font-semibold text-slate-600 dark:text-slate-300">{t("profile.status.lastRequest.heading")}</span>
               <span className="font-medium text-slate-700 dark:text-slate-200">{translatedLastRequestedRole ?? lastRequestedRole}</span>
               {lastRequestText ? <span className="text-slate-500 dark:text-slate-400">{t("profile.status.lastRequest.time", { time: lastRequestText })}</span> : null}
+              {showCancel ? (
+                <div>
+                  <button className="px-2 py-1 rounded border" onClick={cancelRequest} disabled={pending}>{t("admin.users.actions.cancel")}</button>
+                </div>
+              ) : null}
             </div>
           ) : null}
+        </div>
+      </section>
+
+      <section className="space-y-3 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("profile.profile.heading")}</h2>
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+            {t("profile.profile.company")}
+            <input
+              className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              value={company}
+              onChange={e=>setCompany(e.target.value)}
+              placeholder={t("profile.profile.companyPlaceholder")}
+            />
+          </label>
+          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+            {t("profile.profile.firstName")}
+            <input
+              className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              value={firstName}
+              onChange={e=>setFirstName(e.target.value)}
+              placeholder={t("profile.profile.firstNamePlaceholder")}
+            />
+          </label>
+          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+            {t("profile.profile.lastName")}
+            <input
+              className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              value={lastName}
+              onChange={e=>setLastName(e.target.value)}
+              placeholder={t("profile.profile.lastNamePlaceholder")}
+            />
+          </label>
+        </div>
+        <div>
+          <button
+            onClick={saveProfile}
+            disabled={!account || pending}
+            className="rounded-full border border-slate-300/70 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+          >
+            {pending ? t("profile.profile.saving") : t("profile.profile.save")}
+          </button>
         </div>
       </section>
 
@@ -139,7 +273,7 @@ export default function ProfilePage() {
             {pending ? t("profile.request.pending") : t("profile.request.submit")}
           </button>
         </form>
-        {!isApproved && !roleLoading && !isAdmin ? (
+        {pendingRole && !isApproved && !roleLoading && !isAdmin ? (
           <p className="text-xs text-amber-600 dark:text-amber-300">{t("profile.request.notice")}</p>
         ) : null}
       </section>

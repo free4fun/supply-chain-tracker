@@ -83,35 +83,57 @@ export default function AdminUsersPage() {
             </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-2 text-sm font-medium px-2">
-            <div className="col-span-4">{t("admin.users.headers.address")}</div>
-            <div className="col-span-2">{t("admin.users.headers.role")}</div>
-            <div className="col-span-2">{t("admin.users.headers.status")}</div>
-            <div className="col-span-2">{t("admin.users.headers.lastRequest")}</div>
-            <div className="col-span-2">{t("admin.users.headers.actions")}</div>
-        </div>
-        <div className="divide-y">
+        <div className="divide-y border-t border-b">
             {data.length===0 && <p className="text-sm p-2">{t("admin.users.empty")}</p>}
             {data.map(r => (
-            <div key={r.id} className="grid grid-cols-12 gap-2 items-center p-2">
-                <div className="col-span-4 break-all">{r.addr}</div>
-                <div className="col-span-2">{r.role || "-"}</div>
-                <div className={`col-span-2 ${r.status===0?"text-yellow-700":r.status===1?"text-green-700":r.status===2?"text-red-700":"text-gray-600"}`}>
-                {t(`admin.users.status.${STATUS_KEYS[r.status as 0|1|2|3]}`)}
+            <div key={r.id} className="p-4 space-y-3">
+                <div className="grid grid-cols-12 gap-3 items-start text-sm">
+                    <div className="col-span-4 space-y-1">
+                        <div className="font-medium text-slate-500 dark:text-slate-400 text-xs">{t("admin.users.headers.address")}</div>
+                        <div className="break-all font-mono text-xs bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded">{r.addr}</div>
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                        <div className="font-medium text-slate-500 dark:text-slate-400 text-xs">{t("admin.users.headers.role")}</div>
+                        <div className="font-semibold">{r.role ? (t(`roles.${r.role}`) !== `roles.${r.role}` ? t(`roles.${r.role}`) : r.role) : "-"}</div>
+                        {r.pendingRole && r.pendingRole !== r.role ? (
+                            <div className="text-xs text-amber-600 dark:text-amber-400">
+                                {t("admin.users.pendingRole")}: {(t(`roles.${r.pendingRole}`) !== `roles.${r.pendingRole}`) ? t(`roles.${r.pendingRole}`) : r.pendingRole}
+                            </div>
+                        ) : null}
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                        <div className="font-medium text-slate-500 dark:text-slate-400 text-xs">{t("admin.users.headers.status")}</div>
+                        <div className={`font-semibold ${r.status===0?"text-yellow-700 dark:text-yellow-500":r.status===1?"text-green-700 dark:text-green-500":r.status===2?"text-red-700 dark:text-red-500":"text-gray-600 dark:text-gray-400"}`}>
+                            {t(`admin.users.status.${STATUS_KEYS[r.status as 0|1|2|3]}`)}
+                        </div>
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                        <div className="font-medium text-slate-500 dark:text-slate-400 text-xs">{t("admin.users.headers.lastRequest")}</div>
+                        {r.lastRole ? (
+                            <>
+                            <div className="font-semibold">{(t(`roles.${r.lastRole}`) !== `roles.${r.lastRole}`) ? t(`roles.${r.lastRole}`) : r.lastRole}</div>
+                            {r.lastAt ? <div className="text-xs text-gray-500 dark:text-gray-400">{new Date(r.lastAt*1000).toLocaleString()}</div> : null}
+                            </>
+                        ) : <span className="text-gray-400">-</span>}
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                        <div className="font-medium text-slate-500 dark:text-slate-400 text-xs">{t("admin.users.headers.actions")}</div>
+                        <div className="flex flex-wrap gap-1">
+                            <button className="px-2 py-1 rounded border text-xs" onClick={()=>act(r.addr, 1)} disabled={r.status!==0}>{t("admin.users.actions.approve")}</button>
+                            <button className="px-2 py-1 rounded border text-xs" onClick={()=>act(r.addr, 2)} disabled={r.status!==0}>{t("admin.users.actions.reject")}</button>
+                        </div>
+                    </div>
                 </div>
-                <div className="col-span-2">
-                {r.lastRole ? (
-                    <>
-                    <div>{r.lastRole}</div>
-                    {r.lastAt ? <div className="text-xs text-gray-500">{new Date(r.lastAt*1000).toLocaleString()}</div> : null}
-                    </>
-                ) : <span className="text-gray-400">-</span>}
-                </div>
-                <div className="col-span-2 flex gap-1">
-                <button className="px-2 py-1 rounded border" onClick={()=>act(r.addr, 1)} disabled={r.status!==0}>{t("admin.users.actions.approve")}</button>
-                <button className="px-2 py-1 rounded border" onClick={()=>act(r.addr, 2)} disabled={r.status!==0}>{t("admin.users.actions.reject")}</button>
-                <button className="px-2 py-1 rounded border" onClick={()=>act(r.addr, 3)} disabled={r.status!==0}>{t("admin.users.actions.cancel")}</button>
-                </div>
+                {(r.company || r.firstName || r.lastName) ? (
+                    <div className="pl-4 border-l-2 border-slate-200 dark:border-slate-700 space-y-1 text-sm">
+                        <div className="font-medium text-slate-500 dark:text-slate-400 text-xs">{t("admin.users.profile.heading")}</div>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                            {r.company ? <div><span className="text-slate-500 dark:text-slate-400">{t("admin.users.profile.company")}:</span> <span className="font-medium">{r.company}</span></div> : null}
+                            {r.firstName ? <div><span className="text-slate-500 dark:text-slate-400">{t("admin.users.profile.firstName")}:</span> <span className="font-medium">{r.firstName}</span></div> : null}
+                            {r.lastName ? <div><span className="text-slate-500 dark:text-slate-400">{t("admin.users.profile.lastName")}:</span> <span className="font-medium">{r.lastName}</span></div> : null}
+                        </div>
+                    </div>
+                ) : null}
             </div>
             ))}
         </div>
