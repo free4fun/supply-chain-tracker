@@ -120,7 +120,7 @@ function MetadataPanel({ metadata }: { metadata: Record<string, unknown> | null 
   return (
     <dl className="grid gap-3 md:grid-cols-2">
       {Object.entries(metadata).map(([key, value]) => (
-        <div key={key} className="rounded-2xl border border-slate-200/80 bg-white/90 p-3 shadow-sm">
+        <div key={key} className="rounded-2xl border border-surface bg-surface-2 p-3 shadow-sm">
           <dt className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{formatKey(key)}</dt>
           <dd className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{formatValue(value)}</dd>
         </div>
@@ -133,21 +133,21 @@ function TraceTree({ node, depth = 0 }: { node: TraceNode; depth?: number }) {
   return (
     <li className="relative pl-6">
       {depth > 0 ? (
-        <span className="absolute left-0 top-3 h-full border-l-2 border-slate-300" aria-hidden />
+        <span className="absolute left-0 top-3 h-full border-l-2 border-surface" aria-hidden />
       ) : null}
-      <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm">
+      <div className="rounded-2xl border border-surface bg-surface-2 p-4 shadow-sm hover:bg-surface-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-sm font-semibold text-slate-800">#{node.detail.id} · {node.detail.name}</p>
             <p className="text-xs text-slate-500">{node.detail.description || "Sin descripción"}</p>
           </div>
-          <div className="text-right text-xs text-slate-500">
-            <p>Disponible global: {formatBigInt(node.detail.availableSupply)}</p>
-            <p>Creado: {node.detail.createdAt ? new Date(node.detail.createdAt * 1000).toLocaleString() : "-"}</p>
+            <div className="text-right text-xs text-slate-500">
+              <p>Disponible global: {formatBigInt(node.detail.availableSupply)}</p>
+              <p>Creado: {node.detail.createdAt ? new Date(node.detail.createdAt * 1000).toLocaleString("en-US", { timeZone: "UTC" }) : "-"}</p>
           </div>
         </div>
         {typeof node.amount !== "undefined" ? (
-          <p className="mt-2 rounded-xl bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+          <p className="mt-2 rounded-xl bg-surface-2 px-3 py-1 text-xs font-medium text-slate-600">
             Cantidad utilizada: {formatBigInt(node.amount)}
           </p>
         ) : null}
@@ -158,7 +158,7 @@ function TraceTree({ node, depth = 0 }: { node: TraceNode; depth?: number }) {
               {Object.entries(node.detail.metadata)
                 .slice(0, 4)
                 .map(([key, value]) => (
-                  <div key={key} className="rounded-xl bg-slate-100 px-3 py-2">
+                  <div key={key} className="rounded-xl bg-surface-2 px-3 py-2">
                     <span className="block text-[10px] uppercase tracking-[0.3em] text-slate-400">{formatKey(key)}</span>
                     <span className="text-xs text-slate-700">{formatValue(value)}</span>
                   </div>
@@ -315,7 +315,7 @@ export default function TokensPage() {
 
   if (mustConnect) {
     return (
-      <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-6 text-sm text-slate-600 shadow-inner">
+      <div className="rounded-3xl border border-surface bg-surface-1 p-6 text-sm text-slate-600 shadow-inner">
         {t("transfers.connectPrompt")}
       </div>
     );
@@ -351,10 +351,10 @@ export default function TokensPage() {
       </header>
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]">
-        <aside className={`space-y-4 rounded-3xl border ${theme.accentBorder} bg-white/95 p-5 shadow-inner`}>
+        <aside className={`space-y-4 rounded-3xl border ${theme.accentBorder} bg-surface-1 p-5 shadow-inner`}>
           <h2 className="text-sm font-semibold text-slate-700">Tus tokens</h2>
           {tokens.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-slate-300/70 bg-white/70 p-4 text-sm text-slate-500">{theme.empty}</p>
+            <p className="rounded-2xl border border-dashed border-surface bg-surface-2 p-4 text-sm text-slate-500">{theme.empty}</p>
           ) : (
             <div className="grid gap-3">
               {tokens.map(token => {
@@ -367,7 +367,7 @@ export default function TokensPage() {
                     className={`rounded-2xl border px-4 py-3 text-left shadow-sm transition ${
                       isActive
                         ? `border-transparent bg-gradient-to-r ${theme.gradient} text-white`
-                        : `${theme.accentBorder} bg-white/90 text-slate-700 hover:border-slate-300`
+                        : `${theme.accentBorder} bg-surface-2 text-slate-700 hover:border-accent`
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -391,7 +391,7 @@ export default function TokensPage() {
           )}
         </aside>
 
-        <section className={`space-y-5 rounded-3xl border ${theme.accentBorder} bg-white/95 p-6 shadow-inner`}>
+        <section className={`space-y-5 rounded-3xl border ${theme.accentBorder} bg-surface-1 p-6 shadow-inner`}>
           {selectedId && trace ? (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -402,7 +402,7 @@ export default function TokensPage() {
                 <div className="text-right text-xs text-slate-500">
                   <p>Saldo actual: {formatBigInt(trace.detail.balance)}</p>
                   <p>Disponible global: {formatBigInt(trace.detail.availableSupply)}</p>
-                  <p>Creado: {trace.detail.createdAt ? new Date(trace.detail.createdAt * 1000).toLocaleString() : "-"}</p>
+                  <p>Creado: {trace.detail.createdAt ? new Date(trace.detail.createdAt * 1000).toLocaleString("en-US", { timeZone: "UTC" }) : "-"}</p>
                 </div>
               </div>
 

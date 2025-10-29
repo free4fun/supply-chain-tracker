@@ -30,7 +30,7 @@ export default function ChainGuard({ children }: { children: React.ReactNode }) 
 
   if (!ready) {
     return (
-      <div className="rounded-3xl border border-slate-200/70 bg-white/80 px-4 py-3 text-sm text-slate-600 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70 dark:text-slate-300">
+      <div className="rounded-3xl border border-surface bg-surface-1 px-4 py-3 text-sm text-slate-600 shadow-sm dark:text-slate-300">
         {t("chainGuard.loading")}
       </div>
     );

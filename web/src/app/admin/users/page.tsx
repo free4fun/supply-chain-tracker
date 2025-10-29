@@ -112,7 +112,7 @@ export default function AdminUsersPage() {
                         {r.lastRole ? (
                             <>
                             <div className="font-semibold">{(t(`roles.${r.lastRole}`) !== `roles.${r.lastRole}`) ? t(`roles.${r.lastRole}`) : r.lastRole}</div>
-                            {r.lastAt ? <div className="text-xs text-gray-500 dark:text-gray-400">{new Date(r.lastAt*1000).toLocaleString()}</div> : null}
+                            {r.lastAt ? <div className="text-xs text-gray-500 dark:text-gray-400">{new Date(r.lastAt*1000).toLocaleString("en-US", { timeZone: "UTC" })}</div> : null}
                             </>
                         ) : <span className="text-gray-400">-</span>}
                     </div>
@@ -125,7 +125,7 @@ export default function AdminUsersPage() {
                     </div>
                 </div>
                 {(r.company || r.firstName || r.lastName) ? (
-                    <div className="pl-4 border-l-2 border-slate-200 dark:border-slate-700 space-y-1 text-sm">
+                    <div className="pl-4 border-l-2 border-surface space-y-1 text-sm">
                         <div className="font-medium text-slate-500 dark:text-slate-400 text-xs">{t("admin.users.profile.heading")}</div>
                         <div className="grid grid-cols-3 gap-2 text-xs">
                             {r.company ? <div><span className="text-slate-500 dark:text-slate-400">{t("admin.users.profile.company")}:</span> <span className="font-medium">{r.company}</span></div> : null}

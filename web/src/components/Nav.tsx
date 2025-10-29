@@ -97,7 +97,7 @@ export default function Nav() {
           );
         })}
         <div className="ml-auto flex items-center gap-2">
-          <div className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm dark:bg-slate-800 dark:text-slate-100 md:flex md:flex-col md:items-start">
+          <div className="hidden rounded-full bg-surface-2 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm md:flex md:flex-col md:items-start">
             <span>{company || t("landing.connection.role.none")}</span>
             <span className="text-[10px] font-normal uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400">
               {contactName || t("landing.connection.role.requestAccess")}

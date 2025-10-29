@@ -96,7 +96,7 @@ function RoleWorkflowSection({
   const { t } = useI18n();
   const guide = ROLE_GUIDES[selectedRole];
   const isCurrentRole = derivedRole ? selectedRole === derivedRole : false;
-  const lastRequestText = lastRequestedAt ? new Date(lastRequestedAt * 1000).toLocaleString() : undefined;
+  const lastRequestText = lastRequestedAt ? new Date(lastRequestedAt * 1000).toLocaleString("en-US", { timeZone: "UTC" }) : undefined;
   const translatedStatus = statusLabel ? translateStatus(statusLabel, t) : t("common.status.none");
   const selectedRoleLabel = t(`roles.${selectedRole}`);
   const lastRequestedRoleLabel = lastRequestedRole ? t(`roles.${lastRequestedRole}`) : undefined;
@@ -111,7 +111,7 @@ function RoleWorkflowSection({
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
           {t("landing.workflow.selectLabel")}
           <select
-            className="rounded-xl border border-slate-300/60 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            className="rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:text-slate-200"
             value={selectedRole}
             onChange={event => setSelectedRole(event.target.value as RoleKey)}
           >
@@ -171,7 +171,7 @@ function RoleWorkflowSection({
               ) : (
                 <span
                   key={action.href}
-                  className="rounded-full border border-slate-200/80 px-4 py-2 text-sm font-semibold text-slate-500 dark:border-slate-700 dark:text-slate-400"
+                  className="rounded-full border border-surface px-4 py-2 text-sm font-semibold text-slate-500 dark:text-slate-400"
                 >
                   {t(action.labelKey)}
                 </span>
@@ -266,7 +266,7 @@ export default function Page() {
             </button>
             <button
               onClick={switchAcc}
-              className="rounded-full border border-slate-300/60 px-6 py-3 text-sm font-semibold text-slate-800 transition hover:border-indigo-400 hover:text-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:text-slate-200 dark:hover:border-indigo-400"
+              className="rounded-full border border-surface px-6 py-3 text-sm font-semibold text-slate-800 transition hover:border-indigo-400 hover:text-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:text-slate-200"
               disabled={!ready}
             >
               {t("landing.hero.secondary")}

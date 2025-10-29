@@ -156,7 +156,7 @@ export default function ProfilePage() {
           <button onClick={reconnect} className="rounded bg-black px-3 py-1 text-sm font-semibold text-white">
             {t("profile.connect.primary")}
           </button>
-          <button onClick={switchAcc} className="rounded border px-3 py-1 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200">
+          <button onClick={switchAcc} className="rounded border border-surface px-3 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
             {t("profile.connect.secondary")}
           </button>
         </div>
@@ -164,7 +164,7 @@ export default function ProfilePage() {
     );
   }
 
-  const lastRequestText = lastRequestedAt ? new Date(lastRequestedAt * 1000).toLocaleString() : undefined;
+  const lastRequestText = lastRequestedAt ? new Date(lastRequestedAt * 1000).toLocaleString("en-US", { timeZone: "UTC" }) : undefined;
   const translatedRole = activeRole ? t(`roles.${activeRole}`) : isAdmin ? t("roles.Admin") : isRegistered ? t("profile.status.unassigned") : t("common.status.none");
   const translatedStatus = statusLabel ? translateStatus(statusLabel, t) : t("common.status.none");
   const translatedLastRequestedRole = lastRequestedRole ? t(`roles.${lastRequestedRole}`) : undefined;
