@@ -17,6 +17,7 @@ import {
   getUserTransfers,
   listUsers,
   rejectTransfer,
+  cancelTransfer,
   transfer,
   type UserView,
   getUserInfo,
@@ -508,6 +509,27 @@ export default function TransfersPage() {
               }`}>
                 {t("transfers.status", { status: t(`dashboard.status.${STATUS_KEYS[row.status as 0 | 1 | 2] ?? String(row.status)}`) })}
               </span>
+              {row.status === 0 ? (
+                <div className="mt-2 flex gap-2">
+                  <button
+                    className="rounded-full border border-rose-400 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60 dark:text-rose-300"
+                    onClick={async () => {
+                      try {
+                        await cancelTransfer(BigInt(row.id));
+                        push("success", t("transfers.success.cancelled"));
+                        await refreshTransfers();
+                        await refreshTokens({ silent: true });
+                      } catch (err: unknown) {
+                        const message = getErrorMessage(err, t("transfers.errors.operation"));
+                        if (message) push("error", message);
+                      }
+                    }}
+                    disabled={!account}
+                  >
+                    {t("transfers.actions.cancel")}
+                  </button>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

@@ -123,6 +123,12 @@ export async function rejectTransfer(id: bigint) {
   await tx.wait();
 }
 
+export async function cancelTransfer(id: bigint) {
+  const sc = await getContract(true);
+  const tx = await sc.cancelTransfer(id);
+  await tx.wait();
+}
+
 export async function getTransfer(id: number) {
   const sc = await getContract(false);
   return sc.getTransfer(id);

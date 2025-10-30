@@ -21,7 +21,8 @@ contract SupplyChain {
     enum TransferStatus {
         Pending,
         Accepted,
-        Rejected
+        Rejected,
+        Cancelled
     }
 
     // ---------- Structs ----------
@@ -118,6 +119,7 @@ contract SupplyChain {
     );
     event TransferAccepted(uint256 indexed transferId);
     event TransferRejected(uint256 indexed transferId);
+    event TransferCancelled(uint256 indexed transferId);
 
     // ---------- Constructor ----------
     constructor() {
@@ -413,10 +415,11 @@ contract SupplyChain {
         } else {
             require(inputIds.length == inputAmounts.length, "Inputs mismatch");
             require(inputIds.length > 0, "Inputs required");
-            // Anchor lineage to the last received token suggested for this user.
-            // No need to force array ordering; we record the enforced parent independently.
-            uint256 suggested = _resolveParentId(role); // reverts if not assigned
-            parentId = suggested;
+            uint256 suggested = _resolveParentId(role);
+            parentId = inputIds[0];
+            if (suggested != 0) {
+                require(suggested == parentId, "Parent mismatch");
+            }
         }
 
         uint256 tokenId = nextTokenId++;
@@ -460,8 +463,8 @@ contract SupplyChain {
                 tokenInputs[tokenId].push(Component({ tokenId: componentId, amount: amount }));
             }
 
-            // Keep suggested parent anchored to the last received token;
-            // do not override it with the newly created token to avoid forcing self-anchoring.
+            // After transformation the new asset becomes the suggested parent for the creator
+            suggestedParentByUser[msg.sender] = tokenId;
         }
 
         emit TokenCreated(tokenId, msg.sender, name, description, totalSupply, features, parentId);
@@ -567,6 +570,25 @@ contract SupplyChain {
 
         tr.status = TransferStatus.Rejected;
         emit TransferRejected(transferId);
+    }
+
+    /// @notice Cancel a pending transfer. Only the sender can cancel and it must be Pending.
+    function cancelTransfer(uint256 transferId) external {
+        require(transferId != 0 && transferId < nextTransferId, "Transfer not found");
+        Transfer storage tr = transfers[transferId];
+        require(tr.status == TransferStatus.Pending, "Not pending");
+        require(msg.sender == tr.from, "Only sender");
+
+        // Release reservation
+        uint256 reserved = reservedPendingOut[tr.tokenId][tr.from];
+        if (reserved >= tr.amount) {
+            reservedPendingOut[tr.tokenId][tr.from] = reserved - tr.amount;
+        } else {
+            reservedPendingOut[tr.tokenId][tr.from] = 0; // defensive
+        }
+
+        tr.status = TransferStatus.Cancelled;
+        emit TransferCancelled(transferId);
     }
 
     function getUserTokens(address user) external view returns (uint256[] memory) {
