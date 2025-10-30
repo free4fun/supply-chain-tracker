@@ -143,6 +143,40 @@ export async function getTokenBalance(tokenId: number, addr: string) {
   return sc.getTokenBalance(tokenId, addr);
 }
 
+export async function getUserCreatedTokens(addr: string): Promise<number[]> {
+  const sc = await getContract(false);
+  const ids: bigint[] = await sc.getUserCreatedTokens(addr);
+  return ids.map(n => Number(n));
+}
+
+export type CreatedSummary = {
+  createdCount: number;
+  totalSupplySum: bigint;
+  availableSum: bigint;
+  totalConsumedInputs: bigint;
+};
+
+export async function getUserCreatedSummary(addr: string): Promise<CreatedSummary> {
+  const sc = await getContract(false);
+  const res = await sc.getUserCreatedSummary(addr);
+  // Expect tuple [createdCount, totalSupplySum, availableSum, totalConsumedInputs]
+  return {
+    createdCount: Number(res[0]),
+    totalSupplySum: BigInt(res[1]),
+    availableSum: BigInt(res[2]),
+    totalConsumedInputs: BigInt(res[3]),
+  };
+}
+
+export async function getUserBalancesNonZero(addr: string): Promise<{ ids: number[]; balances: bigint[] }> {
+  const sc = await getContract(false);
+  const [idsRaw, balancesRaw]: [bigint[], bigint[]] = await sc.getUserBalancesNonZero(addr);
+  return {
+    ids: idsRaw.map(Number),
+    balances: balancesRaw.map(BigInt),
+  };
+}
+
 export async function nextUserId(): Promise<number> {
   const sc = await getContract(false);
   const n: bigint = await sc.nextUserId();
@@ -166,7 +200,6 @@ export async function getUserById(id: number): Promise<UserView> {
 }
 
 export async function listUsers(): Promise<UserView[]> {
-  const sc = await getContract(false);
   const n = await nextUserId();
   const out: UserView[] = [];
   for (let i = 1; i < n; i++) {

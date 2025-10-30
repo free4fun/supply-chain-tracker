@@ -13,58 +13,8 @@ import {
 import { useRole } from "@/contexts/RoleContext";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { useI18n } from "@/contexts/I18nContext";
+import { useRoleTheme } from "@/hooks/useRoleTheme";
 
-const ROLE_THEMES: Record<string, {
-  label: string;
-  gradient: string;
-  background: string;
-  accentBorder: string;
-  accentMuted: string;
-  intro: string;
-  empty: string;
-  icon: string;
-}> = {
-  Producer: {
-    label: "Viticultor",
-    gradient: "from-emerald-500 to-lime-500",
-    background: "bg-emerald-50",
-    accentBorder: "border-emerald-200",
-    accentMuted: "bg-emerald-100/80",
-    intro: "Visualizá tus lotes de uvas y verificá qué cantidades siguen disponibles para nuevas transferencias o vinificaciones.",
-    empty: "Aún no creaste lotes de uvas. Podés generar uno desde la sección Crear token.",
-    icon: "🍇",
-  },
-  Factory: {
-    label: "Bodega",
-    gradient: "from-rose-500 to-purple-600",
-    background: "bg-rose-50",
-    accentBorder: "border-rose-200",
-    accentMuted: "bg-rose-100/70",
-    intro: "Seguimiento de cada vino elaborado, con el detalle de los lotes de uvas que fueron utilizados y las cantidades consumidas.",
-    empty: "No tenés vinos disponibles. Transformá un lote de uvas aceptado para registrar tu producción.",
-    icon: "🍷",
-  },
-  Retailer: {
-    label: "Distribuidor",
-    gradient: "from-amber-500 to-orange-500",
-    background: "bg-amber-50",
-    accentBorder: "border-amber-200",
-    accentMuted: "bg-amber-100/70",
-    intro: "Armá y monitoreá tus packs especiales. Cada botella utilizada queda registrada para evitar duplicaciones.",
-    empty: "Todavía no recibiste vinos para armar packs. Solicitá una transferencia a la bodega.",
-    icon: "📦",
-  },
-  Consumer: {
-    label: "Consumidor",
-    gradient: "from-sky-500 to-indigo-500",
-    background: "bg-sky-50",
-    accentBorder: "border-sky-200",
-    accentMuted: "bg-sky-100/70",
-    intro: "Explorá la trazabilidad completa de cada pack adquirido: origen, procesos y materias primas.",
-    empty: "Aún no recibiste ningún pack registrado a tu nombre.",
-    icon: "🧭",
-  },
-};
 
 type TokenDetail = {
   id: number;
@@ -181,7 +131,7 @@ function TraceTree({ node, depth = 0 }: { node: TraceNode; depth?: number }) {
 export default function TokensPage() {
   const { t } = useI18n();
   const { account, mustConnect } = useWeb3();
-  const { activeRole, isApproved, loading: roleLoading, statusLabel } = useRole();
+  const { isApproved, loading: roleLoading, statusLabel } = useRole();
 
   const [tokens, setTokens] = useState<TokenDetail[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -190,7 +140,7 @@ export default function TokensPage() {
 
   const cacheRef = useRef(new Map<number, TokenDetail>());
 
-  const theme = ROLE_THEMES[activeRole ?? "Producer"] ?? ROLE_THEMES.Producer;
+  const { theme } = useRoleTheme();
 
   const fetchDetail = useCallback(
     async (id: number, options: { includeBalance?: boolean } = {}): Promise<TokenDetail> => {
@@ -352,7 +302,7 @@ export default function TokensPage() {
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]">
         <aside className={`space-y-4 rounded-3xl border ${theme.accentBorder} bg-surface-1 p-5 shadow-inner`}>
-          <h2 className="text-sm font-semibold text-slate-700">Tus tokens</h2>
+          <h2 className="text-sm font-semibold text-slate-700">Mis tokens</h2>
           {tokens.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-surface bg-surface-2 p-4 text-sm text-slate-500">{theme.empty}</p>
           ) : (

@@ -17,14 +17,6 @@ PK="${PK:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}"  
 USE_MNEMONIC="${USE_MNEMONIC:-1}"  # 1=deploy with mnemonic, 0=deploy with PK
 KEEP_ANVIL="${KEEP_ANVIL:-1}"     # 1=keep running after deploy
 
-# -- Frontend (Next.js)
-WEB_START="${WEB_START:-1}"        # 1=start frontend, 0=skip
-WEB_MODE="${WEB_MODE:-dev}"        # dev|start
-WEB_PORT="${WEB_PORT:-3000}"
-WEB_BIN="${WEB_BIN:-npm}"          # npm|pnpm|yarn
-KEEP_WEB="${KEEP_WEB:-1}"          # 1=keep running after script exit
-WEB_FOREGROUND="${WEB_FOREGROUND:-logs}" # logs|tmux|bg|none
-
 # -- Output behavior
 FOREGROUND="${FOREGROUND:-logs}"   # legacy for anvil only (logs|none|tmux)
 
@@ -75,52 +67,6 @@ start_anvil() {
     done
     echo "[deploy] Anvil ready"
     [[ "$ANVIL_MODE" == "bg" ]] && print_accounts
-  fi
-}
-
-start_frontend() {
-  [[ "$WEB_START" = "1" ]] || { echo "[web] Skipped (WEB_START=0)"; return; }
-
-  echo "[web] Preparing Next.js ($WEB_MODE) on port $WEB_PORT…"
-  cd "$web_dir"
-
-  # Install deps if missing
-  if [[ ! -d node_modules ]]; then
-    echo "[web] Installing dependencies…"
-    if [[ "$WEB_BIN" == "pnpm" ]]; then pnpm install --frozen-lockfile || pnpm install
-    elif [[ "$WEB_BIN" == "yarn" ]]; then yarn install --check-files || yarn install
-    else npm ci --no-audit || npm install --no-audit
-    fi
-  fi
-
-  # Start according to mode
-  if [[ "$WEB_FOREGROUND" == "tmux" ]]; then
-    tmux kill-session -t web >/dev/null 2>&1 || true
-    if [[ "$WEB_MODE" == "start" ]]; then
-      tmux new-session -d -s web "PORT=$WEB_PORT $WEB_BIN run build && PORT=$WEB_PORT $WEB_BIN run start -w -- -p $WEB_PORT"
-    else
-      tmux new-session -d -s web "PORT=$WEB_PORT $WEB_BIN run dev -- -p $WEB_PORT"
-    fi
-    WEB_MODE_RUN="tmux"
-    echo "[web] tmux session 'web' started (Ctrl+b d to detach)."
-    return
-  fi
-
-  # Background with logs (default)
-  if [[ "$WEB_MODE" == "start" ]]; then
-    ( PORT="$WEB_PORT" "$WEB_BIN" run build && PORT="$WEB_PORT" "$WEB_BIN" run start -- -p "$WEB_PORT" ) > "$web_logfile" 2>&1 &
-  else
-    ( PORT="$WEB_PORT" "$WEB_BIN" run dev -- -p "$WEB_PORT" ) > "$web_logfile" 2>&1 &
-  fi
-  WEB_PID=$!
-  WEB_MODE_RUN="bg"
-  echo "[web] Running in background (pid=$WEB_PID). Logs: $web_logfile"
-
-  if [[ "$WEB_FOREGROUND" == "logs" ]]; then
-    echo "[web] Streaming logs (Ctrl+C stops logs; app keeps running if KEEP_WEB=1)…"
-    sleep 0.6 || true
-    tail --pid="${WEB_PID:-999999}" -f "$web_logfile" &
-    WEB_TAIL_PID=$!
   fi
 }
 
@@ -204,14 +150,11 @@ echo "[deploy] Admin:       $ADMIN"
 echo "[deploy] ABI:         web/src/contracts/SupplyChain.abi.json"
 echo "[deploy] Env:         web/.env.local"
 
-# Start frontend
-start_frontend
-
 # Bring anvil logs or tmux if requested (frontend already started)
 if [[ "$ANVIL_MODE" == "bg" && "$KEEP_ANVIL" = "1" && "$FOREGROUND" == "logs" ]]; then
   echo "[deploy] Streaming Anvil logs (Ctrl+C to stop tail)…"
   tail --pid="${ANVIL_PID:-999999}" -f "$logfile"
 elif [[ "$ANVIL_MODE" == "tmux" && "$KEEP_ANVIL" = "1" ]]; then
-  echo "[deploy] Attach tmux: 'anvil' and 'web' sessions available."
+  echo "[deploy] Attach tmux: 'anvil' session available."
   tmux ls || true
 fi

@@ -75,7 +75,8 @@ contract SupplyChain {
 
     // Tokens
     uint256 public nextTokenId = 1;
-    mapping(uint256 => Token) public tokens;
+    // Mapping is internal; expose read-only views via getTokenView to avoid getter issues with mappings in structs
+    mapping(uint256 => Token) private tokens;
     mapping(uint256 => Component[]) private tokenInputs; // tokenId => consumed components
 
     // Transfers
@@ -575,5 +576,80 @@ contract SupplyChain {
 
     function getUserTransfers(address user) external view returns (uint256[] memory) {
         return userTransfers[user];
+    }
+
+    // ---------- Analytics (views) ----------
+    /// @notice Returns tokens created by the given user.
+    function getUserCreatedTokens(address user) external view returns (uint256[] memory) {
+        uint256 total = nextTokenId;
+        uint256 count = 0;
+        // First pass: count
+        for (uint256 i = 1; i < total; i++) {
+            if (tokens[i].creator == user) count++;
+        }
+        uint256[] memory ids = new uint256[](count);
+        if (count == 0) return ids;
+        uint256 idx = 0;
+        for (uint256 i = 1; i < total; i++) {
+            if (tokens[i].creator == user) {
+                ids[idx++] = i;
+            }
+        }
+        return ids;
+    }
+
+    /// @notice Returns a summary for tokens created by user: (createdCount, totalSupplySum, availableSum, totalConsumedInputs)
+    function getUserCreatedSummary(address user)
+        external
+        view
+        returns (
+            uint256 createdCount,
+            uint256 totalSupplySum,
+            uint256 availableSum,
+            uint256 totalConsumedInputs
+        )
+    {
+        uint256 total = nextTokenId;
+        for (uint256 i = 1; i < total; i++) {
+            Token storage t = tokens[i];
+            if (t.creator == user) {
+                createdCount++;
+                totalSupplySum += t.totalSupply;
+                availableSum += t.availableSupply;
+                // Sum inputs consumed to create token i
+                Component[] storage comps = tokenInputs[i];
+                for (uint256 k = 0; k < comps.length; k++) {
+                    totalConsumedInputs += comps[k].amount;
+                }
+            }
+        }
+        return (createdCount, totalSupplySum, availableSum, totalConsumedInputs);
+    }
+
+    /// @notice Returns ids with non-zero balance for a user and their balances.
+    function getUserBalancesNonZero(address user)
+        external
+        view
+        returns (uint256[] memory ids, uint256[] memory balances)
+    {
+        uint256[] storage all = userTokens[user];
+        uint256 count = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            uint256 id = all[i];
+            if (tokens[id].balance[user] > 0) count++;
+        }
+        ids = new uint256[](count);
+        balances = new uint256[](count);
+        if (count == 0) return (ids, balances);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            uint256 id = all[i];
+            uint256 bal = tokens[id].balance[user];
+            if (bal > 0) {
+                ids[idx] = id;
+                balances[idx] = bal;
+                idx++;
+            }
+        }
     }
 }

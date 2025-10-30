@@ -65,13 +65,21 @@ body {
     linear-gradient(135deg, rgba(12, 14, 25, 0.92), rgba(2, 3, 10, 0.92));
 }
 
-/* Theme accents per role (applied by ThemeController on <body>) */
-body.theme-none { --accent: #6366f1; --accent-2: #0ea5e9; }
-body.theme-producer { --accent: #10b981; --accent-2: #34d399; }
-body.theme-factory { --accent: #7c3aed; --accent-2: #6366f1; }
-body.theme-retailer { --accent: #f59e0b; --accent-2: #f97316; }
-body.theme-consumer { --accent: #06b6d4; --accent-2: #0ea5e9; }
-body.theme-admin { --accent: #ef4444; --accent-2: #f43f5e; }
+/* Theme accents per role (applied by ThemeController on <body>) - Light mode */
+body.theme-none { --accent: #4f46e5; --accent-2: #0284c7; }
+body.theme-producer { --accent: #047857; --accent-2: #059669; }
+body.theme-factory { --accent: #6d28d9; --accent-2: #7c3aed; }
+body.theme-retailer { --accent: #c2410c; --accent-2: #d97706; }
+body.theme-consumer { --accent: #0e7490; --accent-2: #0891b2; }
+body.theme-admin { --accent: #b91c1c; --accent-2: #dc2626; }
+
+/* Theme accents per role - Dark mode (brighter, more vibrant) */
+.dark body.theme-none { --accent: #818cf8; --accent-2: #38bdf8; }
+.dark body.theme-producer { --accent: #34d399; --accent-2: #6ee7b7; }
+.dark body.theme-factory { --accent: #a78bfa; --accent-2: #c4b5fd; }
+.dark body.theme-retailer { --accent: #fbbf24; --accent-2: #fcd34d; }
+.dark body.theme-consumer { --accent: #22d3ee; --accent-2: #67e8f9; }
+.dark body.theme-admin { --accent: #f87171; --accent-2: #fca5a5; }
 
 /* Utility classes for surfaces and accents */
 .bg-surface-1 { background-color: var(--surface-1); }
@@ -93,7 +101,18 @@ body.theme-admin { --accent: #ef4444; --accent-2: #f43f5e; }
   color: #fff;
 }
 
+.bg-gradient-accent {
+  background-image: linear-gradient(to right, var(--accent), var(--accent-2));
+}
+
 .focus-outline-accent:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* Force h2 font-weight to override external stylesheets */
+h2,
+h2.font-semibold,
+body h2 {
+  font-weight: 600 !important;
 }

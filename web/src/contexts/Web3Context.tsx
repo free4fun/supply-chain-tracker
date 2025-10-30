@@ -64,6 +64,11 @@ export function Web3Provider({ children }: { children: ReactNode }) {
     error: undefined,
   });
 
+  // localStorage keys
+  const LS_CONNECTED = "web3.connected";
+  const LS_ACCOUNT = "web3.account";
+  const LS_CHAIN = "web3.chainId";
+
   // 1) Silencia SOLO el spam de "User rejected the request." de la wallet
   useEffect(() => {
     const orig = console.error;
@@ -97,31 +102,75 @@ export function Web3Provider({ children }: { children: ReactNode }) {
           chainId: cid,
           error: undefined,
         }));
+        // Sync persisted session
+        try {
+          if (typeof window !== "undefined") {
+            if (accs && accs[0]) {
+              localStorage.setItem(LS_CONNECTED, "1");
+              localStorage.setItem(LS_ACCOUNT, accs[0]);
+              if (cid) localStorage.setItem(LS_CHAIN, String(cid));
+            } else {
+              localStorage.removeItem(LS_CONNECTED);
+              localStorage.removeItem(LS_ACCOUNT);
+              localStorage.removeItem(LS_CHAIN);
+            }
+          }
+        } catch {}
       } catch {
         setState(s => ({ ...s, ready: true, mustConnect: true }));
       }
     })();
 
-    const onAcc = (a: string[]) =>
+    const onAcc = (a: string[]) => {
+      const nextAcc = a?.[0];
+      // Persist or clear session
+      try {
+        if (typeof window !== "undefined") {
+          if (nextAcc) {
+            localStorage.setItem(LS_CONNECTED, "1");
+            localStorage.setItem(LS_ACCOUNT, nextAcc);
+          } else {
+            localStorage.removeItem(LS_CONNECTED);
+            localStorage.removeItem(LS_ACCOUNT);
+            localStorage.removeItem(LS_CHAIN);
+          }
+        }
+      } catch {}
       setState(s => ({
         ...s,
-        account: a?.[0],
+        account: nextAcc,
         mustConnect: !(a && a[0]),
-        chainId: a?.[0] ? s.chainId : undefined,
+        chainId: nextAcc ? s.chainId : undefined,
         error: undefined,
       }));
+    };
     const onChain = (hex: string | number) =>
-      setState(s => ({
-        ...s,
-        chainId: typeof hex === "string" ? parseInt(hex, 16) : Number(hex),
-      }));
+      {
+        const cid = typeof hex === "string" ? parseInt(hex, 16) : Number(hex);
+        try {
+          if (typeof window !== "undefined") localStorage.setItem(LS_CHAIN, String(cid));
+        } catch {}
+        setState(s => ({
+          ...s,
+          chainId: cid,
+        }));
+      };
     const onDisconnect = () =>
-      setState(s => ({
-        ...s,
-        account: undefined,
-        chainId: undefined,
-        mustConnect: true,
-      }));
+      {
+        try {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem(LS_CONNECTED);
+            localStorage.removeItem(LS_ACCOUNT);
+            localStorage.removeItem(LS_CHAIN);
+          }
+        } catch {}
+        setState(s => ({
+          ...s,
+          account: undefined,
+          chainId: undefined,
+          mustConnect: true,
+        }));
+      };
     const subscribe = (event: string, handler: (...args: any[]) => void) => {
       if (typeof eth.on === "function" && typeof eth.removeListener === "function") {
         eth.on(event, handler);
@@ -164,6 +213,13 @@ export function Web3Provider({ children }: { children: ReactNode }) {
       }
       const cid = await readChainId(eth);
       setState(s => ({ ...s, account: accs[0], mustConnect: false, chainId: cid, error: undefined }));
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(LS_CONNECTED, "1");
+          localStorage.setItem(LS_ACCOUNT, accs[0]);
+          if (cid) localStorage.setItem(LS_CHAIN, String(cid));
+        }
+      } catch {}
     } catch (e: any) {
       setState(s => ({ ...s, error: e?.message ?? "Error al conectar", mustConnect: true }));
     }
@@ -190,6 +246,13 @@ export function Web3Provider({ children }: { children: ReactNode }) {
   };
 
   const disconnect = () => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(LS_CONNECTED);
+        localStorage.removeItem(LS_ACCOUNT);
+        localStorage.removeItem(LS_CHAIN);
+      }
+    } catch {}
     setState(s => ({
       ...s,
       account: undefined,

@@ -36,6 +36,7 @@ export default function AdminUsersPage() {
     useEffect(() => { 
         if (!account) return;
         load(); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [account]);
 
     if (mustConnect)

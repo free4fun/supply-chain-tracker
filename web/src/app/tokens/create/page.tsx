@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { useToast } from "@/contexts/ToastContext";
 import { useWeb3 } from "@/contexts/Web3Context";
@@ -192,6 +193,7 @@ export default function CreateTokenPage() {
   const { account } = useWeb3();
   const { t } = useI18n();
   const { activeRole, isApproved, loading: roleLoading, isAdmin, statusLabel, company, firstName, lastName } = useRole();
+  const searchParams = useSearchParams();
 
   const roleKey = activeRole ?? (isAdmin ? "Producer" : undefined);
   const config = roleKey ? ROLE_CONFIG[roleKey] : undefined;
@@ -272,6 +274,19 @@ export default function CreateTokenPage() {
       cancelled = true;
     };
   }, [account, config?.requiresComponents]);
+
+  // Preselect a component if query param ?from= is provided and role requires components
+  useEffect(() => {
+    if (!config?.requiresComponents) return;
+    const from = searchParams?.get("from");
+    if (!from) return;
+    const id = Number(from);
+    if (!Number.isFinite(id) || id <= 0) return;
+    // Wait for inventory to load
+    const item = availableInventory.find(t => t.id === id);
+    if (!item) return;
+    setInputs([{ tokenId: id, amount: "" }]);
+  }, [config?.requiresComponents, searchParams, availableInventory]);
 
   useEffect(() => {
     if (!account) {

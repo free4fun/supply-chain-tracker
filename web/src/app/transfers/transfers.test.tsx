@@ -17,7 +17,11 @@ vi.mock("@/lib/sc", () => ({
   acceptTransfer: vi.fn(async () => {}),
   rejectTransfer: vi.fn(async () => {}),
   getUserTransfers: vi.fn(async () => []),
-  getTransfer: vi.fn(async () => {})
+  getTransfer: vi.fn(async () => {}),
+  getUserTokens: vi.fn(async () => []),
+  getTokenBalance: vi.fn(async () => 0n),
+  listUsers: vi.fn(async () => []),
+  getTokenView: vi.fn(async () => [1n, "0x0", "Token", "", 100n, "{}", 0n, 0n, 100n])
 }));
 
 describe("TransfersPage", () => {
