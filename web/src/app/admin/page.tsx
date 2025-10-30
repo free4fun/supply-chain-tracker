@@ -5,6 +5,7 @@ import { isAddress } from "ethers";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { useToast } from "@/contexts/ToastContext";
 import { useI18n } from "@/contexts/I18nContext";
+import { getErrorMessage } from "@/lib/errors";
 
 const ADMIN_ENV = (process.env.NEXT_PUBLIC_ADMIN_ADDRESS || "").toLowerCase();
 
@@ -55,7 +56,10 @@ export default function AdminPage() {
       setPending(true);
       await changeStatusUser(addr, status);
       push("success", t("admin.page.success"));
-    } catch (e:any) { push("error", e?.message || t("admin.page.txFailed")); }
+    } catch (e:any) { 
+      const message = getErrorMessage(e, t("admin.page.txFailed"));
+      if (message) push("error", message);
+    }
     finally { setPending(false); }
   }
 

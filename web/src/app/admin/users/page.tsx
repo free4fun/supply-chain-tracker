@@ -5,6 +5,7 @@ import { listUsers, lastRoleRequestByUser, type UserView } from "@/lib/sc";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { useToast } from "@/contexts/ToastContext";
 import { useI18n } from "@/contexts/I18nContext";
+import { getErrorMessage } from "@/lib/errors";
 
 const ADMIN_ENV = (process.env.NEXT_PUBLIC_ADMIN_ADDRESS || "").toLowerCase();
 const STATUS_KEYS = ["Pending", "Approved", "Rejected", "Canceled"] as const;
@@ -68,7 +69,10 @@ export default function AdminUsersPage() {
             await changeStatusUser(addr, s);
             push("success", t("admin.users.statusUpdated", { status: t(`admin.users.status.${STATUS_KEYS[s as 0|1|2|3]}`) }));
             await load();
-        } catch (e:any) { push("error", e?.message || t("admin.users.txFailed")); }
+        } catch (e:any) { 
+            const message = getErrorMessage(e, t("admin.users.txFailed"));
+            if (message) push("error", message);
+        }
     }
 
     const data = rows.filter(r => (onlyPending ? r.status === 0 : true));

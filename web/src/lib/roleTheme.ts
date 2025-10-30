@@ -12,11 +12,22 @@ export type RoleTheme = {
 };
 
 export const ROLE_THEMES: Record<string, RoleTheme> = {
+  None: {
+    label: "Sin rol",
+    gradient: "from-slate-400 to-slate-500",
+    background: "bg-surface-1",
+    accentBorder: "border-surface",
+    accentMuted: "bg-surface-2",
+    intro: "Conectate para ver tu panel y acciones disponibles.",
+    empty: "Sin datos para mostrar.",
+    icon: "👤",
+    accentHex: "#64748b",
+  },
   Producer: {
     label: "Viticultor",
     gradient: "from-emerald-500 to-lime-500",
     background: "bg-emerald-50",
-    accentBorder: "border-emerald-200",
+    accentBorder: "border-emerald-200 dark:border-emerald-500",
     accentMuted: "bg-emerald-100/80",
     intro:
       "Visualizá tus lotes de uvas y verificá qué cantidades siguen disponibles para nuevas transferencias o vinificaciones.",
@@ -29,7 +40,7 @@ export const ROLE_THEMES: Record<string, RoleTheme> = {
     label: "Bodega",
     gradient: "from-rose-500 to-purple-600",
     background: "bg-rose-50",
-    accentBorder: "border-rose-200",
+    accentBorder: "border-rose-200 dark:border-rose-500",
     accentMuted: "bg-rose-100/70",
     intro:
       "Seguimiento de cada vino elaborado, con el detalle de los lotes de uvas que fueron utilizados y las cantidades consumidas.",
@@ -42,7 +53,7 @@ export const ROLE_THEMES: Record<string, RoleTheme> = {
     label: "Distribuidor",
     gradient: "from-amber-500 to-orange-500",
     background: "bg-amber-50",
-    accentBorder: "border-amber-200",
+    accentBorder: "border-amber-200 dark:border-amber-500",
     accentMuted: "bg-amber-100/70",
     intro:
       "Armá y monitoreá tus packs especiales. Cada botella utilizada queda registrada para evitar duplicaciones.",
@@ -55,7 +66,7 @@ export const ROLE_THEMES: Record<string, RoleTheme> = {
     label: "Consumidor",
     gradient: "from-sky-500 to-indigo-500",
     background: "bg-sky-50",
-    accentBorder: "border-sky-200",
+    accentBorder: "border-sky-200 dark:border-sky-500",
     accentMuted: "bg-sky-100/70",
     intro:
       "Explorá la trazabilidad completa de cada pack adquirido: origen, procesos y materias primas.",
@@ -66,5 +77,5 @@ export const ROLE_THEMES: Record<string, RoleTheme> = {
 };
 
 export function getRoleTheme(role?: string): RoleTheme {
-  return ROLE_THEMES[role ?? "Producer"] ?? ROLE_THEMES.Producer;
+  return ROLE_THEMES[role ?? "None"] ?? ROLE_THEMES.None;
 }

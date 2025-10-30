@@ -7,6 +7,8 @@ import { useToast } from "@/contexts/ToastContext";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { useRole } from "@/contexts/RoleContext";
 import { useI18n } from "@/contexts/I18nContext";
+import { useRoleTheme } from "@/hooks/useRoleTheme";
+import { getErrorMessage } from "@/lib/errors";
 
 const ROLES = ["Producer", "Factory", "Retailer", "Consumer"] as const;
 const schema = z.object({ role: z.enum(ROLES) });
@@ -18,6 +20,7 @@ enum ToastKind {
 
 export default function ProfilePage() {
   const { t } = useI18n();
+  const { theme } = useRoleTheme();
   const { activeRole, statusLabel, isRegistered, isApproved, lastRequestedRole, lastRequestedAt, pendingRole, company: companySnap, firstName: firstNameSnap, lastName: lastNameSnap, refresh, loading: roleLoading, isAdmin } = useRole();
   const initialRole = useMemo<(typeof ROLES)[number]>(() => {
     const candidate = (activeRole || lastRequestedRole) as (typeof ROLES)[number] | undefined;
@@ -90,11 +93,13 @@ export default function ProfilePage() {
       push(ToastKind.Success, t("profile.toast.success"));
       await refresh();
     } catch (err: unknown) {
-      let message = err instanceof Error ? err.message : t("profile.toast.failure");
-      if (message.includes("CALL_EXCEPTION") || message.includes("execution reverted")) {
-        message = t("profile.toast.contractOutdated");
+      let message = getErrorMessage(err, t("profile.toast.failure"));
+      if (message) {
+        if (message.includes("CALL_EXCEPTION") || message.includes("execution reverted")) {
+          message = t("profile.toast.contractOutdated");
+        }
+        push(ToastKind.Error, message);
       }
-      push(ToastKind.Error, message);
     } finally {
       setPending(false);
     }
@@ -119,11 +124,13 @@ export default function ProfilePage() {
       push(ToastKind.Success, t("profile.profile.saved"));
       await refresh();
     } catch (err: unknown) {
-      let message = err instanceof Error ? err.message : t("profile.toast.failure");
-      if (message.includes("CALL_EXCEPTION") || message.includes("execution reverted")) {
-        message = t("profile.toast.contractOutdated");
+      let message = getErrorMessage(err, t("profile.toast.failure"));
+      if (message) {
+        if (message.includes("CALL_EXCEPTION") || message.includes("execution reverted")) {
+          message = t("profile.toast.contractOutdated");
+        }
+        push(ToastKind.Error, message);
       }
-      push(ToastKind.Error, message);
     } finally {
       setPending(false);
     }
@@ -140,8 +147,8 @@ export default function ProfilePage() {
       push(ToastKind.Success, t("profile.toast.cancelSuccess"));
       await refresh();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t("profile.toast.failure");
-      push(ToastKind.Error, message);
+      const message = getErrorMessage(err, t("profile.toast.failure"));
+      if (message) push(ToastKind.Error, message);
     } finally {
       setPending(false);
     }
@@ -174,7 +181,7 @@ export default function ProfilePage() {
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">{t("profile.title")}</h1>
 
-  <section className="space-y-3 rounded-3xl border border-surface bg-surface-1 p-6 shadow-inner">
+  <section className={`space-y-3 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-6 shadow-inner`}>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("profile.status.heading")}</h2>
         <div className="grid gap-2 text-sm text-slate-700 dark:text-slate-300">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -206,7 +213,7 @@ export default function ProfilePage() {
         </div>
       </section>
 
-  <section className="space-y-3 rounded-3xl border border-surface bg-surface-1 p-6 shadow-inner">
+  <section className={`space-y-3 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-6 shadow-inner`}>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("profile.profile.heading")}</h2>
         <div className="grid gap-3 md:grid-cols-3">
           <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -248,7 +255,7 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      <section className="space-y-3 rounded-3xl border border-surface bg-surface-1 p-6 shadow-inner">
+  <section className={`space-y-3 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-6 shadow-inner`}>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("profile.request.heading")}</h2>
         <p className="text-sm text-slate-600 dark:text-slate-400">{t("profile.request.description")}</p>
         <form onSubmit={submit} className="flex flex-wrap items-center gap-3">

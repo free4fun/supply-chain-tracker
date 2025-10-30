@@ -6,7 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { useRole } from "@/contexts/RoleContext";
 import { useBlockWatcher } from "@/hooks/useBlockWatcher";
-import { getUserTokens, getTokenBalance, getUserTransfers, getTransfer, getTokenView, acceptTransfer, rejectTransfer, getUserCreatedSummary, getUserBalancesNonZero } from "@/lib/sc";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { getUserTokens, getTokenBalance, getUserTransfers, getTransfer, getTokenView, acceptTransfer, rejectTransfer, getUserCreatedSummary, getUserBalancesNonZero, getUserCreatedTokens } from "@/lib/sc";
 import RecentTransfers, { type RecentItem } from "@/components/RecentTransfers";
 import StatsSection from "@/components/dashboard/StatsSection";
 import TimelineSection from "@/components/dashboard/TimelineSection";
@@ -14,16 +15,18 @@ import PendingTransfersSection from "@/components/dashboard/PendingTransfersSect
 import TokensSection from "@/components/dashboard/TokensSection";
 import { useI18n } from "@/contexts/I18nContext";
 import { useRoleTheme } from "@/hooks/useRoleTheme";
-import QuickLinks from "@/components/dashboard/QuickLinks";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function Dashboard() {
   const { t } = useI18n();
+  useRequireAuth(); // Redirige a home si no hay cuenta
   const { account, mustConnect, error } = useWeb3();
   const { activeRole, isApproved, loading: roleLoading, statusLabel } = useRole();
   const { theme } = useRoleTheme();
 
   const [tokens, setTokens] = useState<number[]>([]);
   const [balances, setBalances] = useState<Record<number, string>>({});
+  const [tokenNames, setTokenNames] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [pendingTransfers, setPendingTransfers] = useState<Array<{
     id: number;
@@ -34,6 +37,7 @@ export default function Dashboard() {
     dateCreated: number;
     status: number;
     tokenName?: string;
+    direction: "in" | "out";
   }>>([]);
   const [txBusy, setTxBusy] = useState<Record<number, boolean>>({});
   
@@ -57,13 +61,20 @@ export default function Dashboard() {
         const ids = await getUserTokens(account);
         const nums = ids.map(Number);
         setTokens(nums);
-        const balPairs = await Promise.all(
+        const entries = await Promise.all(
           nums.map(async (id: number) => {
-            const bal = await getTokenBalance(id, account);
-            return [id, bal.toString()] as const;
+            const [bal, name] = await Promise.all([
+              getTokenBalance(id, account).catch(() => 0n as any),
+              getTokenView(id).then(tv => String(tv[2])).catch(() => undefined),
+            ]);
+            const balStr = (typeof bal === 'bigint' ? bal : BigInt(bal)).toString();
+            return { id, balStr, name };
           })
         );
-        setBalances(Object.fromEntries(balPairs));
+        setBalances(Object.fromEntries(entries.map(e => [e.id, e.balStr])));
+        const nameMap: Record<number, string> = {};
+        for (const e of entries) if (e.name) nameMap[e.id] = e.name;
+        setTokenNames(nameMap);
       } catch (err: unknown) {
         console.error(err);
       } finally {
@@ -134,15 +145,19 @@ export default function Dashboard() {
     return () => { cancel = true; };
   }, [account, mustConnect]);
 
-  // Load recent transfers (incoming and outgoing) and build timeline buckets for current month (by day)
+  // Load recent activity (transfers + creations) and build timeline buckets for current month (by day)
   useEffect(() => {
     let cancel = false;
     (async () => {
       if (!account || mustConnect) { if (!cancel) { setRecent([]); setTimelineCounts([]); } return; }
       try {
-        const ids: bigint[] = await getUserTransfers(account);
+        const [transferIds, createdTokenIds] = await Promise.all([
+          getUserTransfers(account).catch(() => [] as bigint[]),
+          getUserCreatedTokens(account).catch(() => [] as number[]),
+        ]);
         const items: RecentItem[] = [];
-        for (const rawId of ids) {
+        // Transfers
+        for (const rawId of transferIds) {
           try {
             const id = Number(rawId);
             const v = await getTransfer(id);
@@ -157,7 +172,17 @@ export default function Dashboard() {
               const tv = await getTokenView(tokenId);
               tokenName = String(tv[2]);
             } catch {}
-            items.push({ id, direction, status, tokenId, tokenName, amount, dateCreated: date });
+            items.push({ type: "transfer", id, direction, status, tokenId, tokenName, amount, dateCreated: date });
+          } catch {}
+        }
+        // Creations
+        for (const tokenId of createdTokenIds) {
+          try {
+            const tv = await getTokenView(Number(tokenId));
+            const name = String(tv[2]);
+            const totalSupply = BigInt(tv[4]);
+            const date = Number(tv[7]);
+            items.push({ type: "creation", id: Number(tokenId), tokenId: Number(tokenId), tokenName: name, totalSupply, dateCreated: date });
           } catch {}
         }
         // Build timeline buckets for current calendar month (UTC), one bucket per day
@@ -173,8 +198,13 @@ export default function Dashboard() {
             if (timelineMode === "count") {
               buckets[idx] += 1;
             } else {
-              const n = Number(it.amount);
-              buckets[idx] += Number.isFinite(n) ? n : 0;
+              if (it.type === "transfer") {
+                const n = Number(it.amount);
+                buckets[idx] += Number.isFinite(n) ? n : 0;
+              } else {
+                const n = Number(it.totalSupply);
+                buckets[idx] += Number.isFinite(n) ? n : 0;
+              }
             }
           }
         }
@@ -191,7 +221,7 @@ export default function Dashboard() {
     return () => { cancel = true; };
   }, [account, mustConnect, timelineMode]);
 
-  // Load pending transfers for this user (recipient)
+  // Load pending transfers for this user (incoming and outgoing)
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -201,7 +231,7 @@ export default function Dashboard() {
       }
       try {
         const ids: bigint[] = await getUserTransfers(account);
-        const rows: Array<{ id: number; from: string; to: string; tokenId: number; amount: bigint; dateCreated: number; status: number; tokenName?: string }>
+        const rows: Array<{ id: number; from: string; to: string; tokenId: number; amount: bigint; dateCreated: number; status: number; tokenName?: string; direction: "in" | "out" }>
           = [];
         for (const raw of ids) {
           try {
@@ -209,7 +239,11 @@ export default function Dashboard() {
             const v = await getTransfer(id);
             const status = Number(v[6]);
             const to = String(v[2]);
-            if (status === 0 && to.toLowerCase() === account.toLowerCase()) {
+            const from = String(v[1]);
+            const isPending = status === 0;
+            const isIncoming = to.toLowerCase() === account.toLowerCase();
+            const isOutgoing = from.toLowerCase() === account.toLowerCase();
+            if (isPending && (isIncoming || isOutgoing)) {
               const tokenId = Number(v[3]);
               let tokenName: string | undefined = undefined;
               try {
@@ -218,13 +252,14 @@ export default function Dashboard() {
               } catch {}
               rows.push({
                 id,
-                from: String(v[1]),
+                from,
                 to,
                 tokenId,
                 dateCreated: Number(v[4]),
                 amount: BigInt(v[5]),
                 status,
                 tokenName,
+                direction: isIncoming ? "in" : "out",
               });
             }
           } catch {}
@@ -239,7 +274,7 @@ export default function Dashboard() {
   }, [account, mustConnect]);
 
   // Manual refresh: reload all on-chain sections in parallel
-  const refreshAll = useCallback(async () => {
+  const refreshAll = useCallback(async ({ silent }: { silent?: boolean } = {}) => {
     if (!account || mustConnect) {
       // Reset to empty state if not connected
       setTokens([]);
@@ -251,7 +286,7 @@ export default function Dashboard() {
       return;
     }
 
-    setRefreshing(true);
+    if (!silent) setRefreshing(true);
     try {
       await Promise.all([
         // Balances and owned tokens
@@ -291,12 +326,15 @@ export default function Dashboard() {
             setInventorySummary({ tokensWithBalance: 0, totalBalance: 0n });
           }
         })(),
-        // Recent transfers and timeline (current month by day)
+        // Recent activity and timeline (current month by day)
         (async () => {
           try {
-            const ids: bigint[] = await getUserTransfers(account);
+            const [transferIds, createdTokenIds] = await Promise.all([
+              getUserTransfers(account).catch(() => [] as bigint[]),
+              getUserCreatedTokens(account).catch(() => [] as number[]),
+            ]);
             const items: RecentItem[] = [];
-            for (const rawId of ids) {
+            for (const rawId of transferIds) {
               try {
                 const id = Number(rawId);
                 const v = await getTransfer(id);
@@ -311,7 +349,17 @@ export default function Dashboard() {
                   const tv = await getTokenView(tokenId);
                   tokenName = String(tv[2]);
                 } catch {}
-                items.push({ id, direction, status, tokenId, tokenName, amount, dateCreated: date });
+                items.push({ type: "transfer", id, direction, status, tokenId, tokenName, amount, dateCreated: date });
+              } catch {}
+            }
+            // Add creations
+            for (const tokenId of createdTokenIds) {
+              try {
+                const tv = await getTokenView(Number(tokenId));
+                const name = String(tv[2]);
+                const totalSupply = BigInt(tv[4]);
+                const date = Number(tv[7]);
+                items.push({ type: "creation", id: Number(tokenId), tokenId: Number(tokenId), tokenName: name, totalSupply, dateCreated: date });
               } catch {}
             }
             const now = new Date();
@@ -326,8 +374,13 @@ export default function Dashboard() {
                 if (timelineMode === "count") {
                   counts[idx] += 1;
                 } else {
-                  const n = Number(it.amount);
-                  counts[idx] += Number.isFinite(n) ? n : 0;
+                  if (it.type === "transfer") {
+                    const n = Number(it.amount);
+                    counts[idx] += Number.isFinite(n) ? n : 0;
+                  } else {
+                    const n = Number(it.totalSupply);
+                    counts[idx] += Number.isFinite(n) ? n : 0;
+                  }
                 }
               }
             }
@@ -340,7 +393,7 @@ export default function Dashboard() {
             setTimelineCounts([]);
           }
         })(),
-        // Pending transfers (recipient)
+        // Pending transfers (incoming and outgoing)
         (async () => {
           try {
             const ids: bigint[] = await getUserTransfers(account);
@@ -353,6 +406,7 @@ export default function Dashboard() {
               dateCreated: number;
               status: number;
               tokenName?: string;
+              direction: "in" | "out";
             }> = [];
             for (const raw of ids) {
               try {
@@ -360,7 +414,11 @@ export default function Dashboard() {
                 const v = await getTransfer(id);
                 const status = Number(v[6]);
                 const to = String(v[2]);
-                if (status === 0 && to.toLowerCase() === account.toLowerCase()) {
+                const from = String(v[1]);
+                const isPending = status === 0;
+                const isIncoming = to.toLowerCase() === account.toLowerCase();
+                const isOutgoing = from.toLowerCase() === account.toLowerCase();
+                if (isPending && (isIncoming || isOutgoing)) {
                   const tokenId = Number(v[3]);
                   let tokenName: string | undefined = undefined;
                   try {
@@ -369,13 +427,14 @@ export default function Dashboard() {
                   } catch {}
                   rows.push({
                     id,
-                    from: String(v[1]),
+                    from,
                     to,
                     tokenId,
                     dateCreated: Number(v[4]),
                     amount: BigInt(v[5]),
                     status,
                     tokenName,
+                    direction: isIncoming ? "in" : "out",
                   });
                 }
               } catch {}
@@ -388,7 +447,7 @@ export default function Dashboard() {
         })(),
       ]);
     } finally {
-      setRefreshing(false);
+      if (!silent) setRefreshing(false);
     }
   }, [account, mustConnect, refreshBalances, timelineMode]);
   
@@ -396,27 +455,33 @@ export default function Dashboard() {
     setTxBusy(prev => ({ ...prev, [id]: true }));
     try {
       await acceptTransfer(BigInt(id));
-      // Refresh lists
+      // Optimistic update then full refresh of all on-chain sections
       setPendingTransfers(prev => prev.filter(t => t.id !== id));
-      await refreshBalances({ silent: true });
+      await refreshAll();
     } catch (err) {
-      console.error(err);
+      const message = getErrorMessage(err, "Error accepting transfer");
+      if (message) console.error(message);
     } finally {
       setTxBusy(prev => ({ ...prev, [id]: false }));
     }
-  }, [refreshBalances]);
+  }, [refreshAll]);
 
   const handleReject = useCallback(async (id: number) => {
     setTxBusy(prev => ({ ...prev, [id]: true }));
     try {
       await rejectTransfer(BigInt(id));
       setPendingTransfers(prev => prev.filter(t => t.id !== id));
+      await refreshAll();
     } catch (err) {
-      console.error(err);
+      const message = getErrorMessage(err, "Error rejecting transfer");
+      if (message) console.error(message);
     } finally {
       setTxBusy(prev => ({ ...prev, [id]: false }));
     }
-  }, []);
+  }, [refreshAll]);
+
+  // Background refresh of all sections on each new block (silent, no header spinner)
+  useBlockWatcher(() => { void refreshAll({ silent: true }); }, [refreshAll]);
 
   if (mustConnect) {
     return (
@@ -484,7 +549,6 @@ export default function Dashboard() {
 
         {/* Columna derecha: apilado vertical */}
         <div className="space-y-6">
-          <QuickLinks activeRole={activeRole} theme={theme} t={t} />
           <TimelineSection
             t={t}
             counts={timelineCounts}
@@ -492,7 +556,7 @@ export default function Dashboard() {
             setMode={m => setTimelineMode(m)}
             barColor={theme.accentHex}
           />
-          <TokensSection t={t} tokens={tokens} balances={balances} loading={loading} />
+          <TokensSection t={t} tokens={tokens} balances={balances} names={tokenNames} loading={loading} />
           
         </div>
       </div>

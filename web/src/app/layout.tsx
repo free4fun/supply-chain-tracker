@@ -11,14 +11,7 @@ import ThemeController from "@/components/ThemeController";
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
-        {/* Early script: apply manual dark mode before paint based on persisted preference */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              "try{var s=localStorage.getItem('color-scheme');if(s==='dark'){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}",
-          }}
-        />
+      <body>       
         <I18nProvider>
           <Web3Provider>
             <ToastProvider>

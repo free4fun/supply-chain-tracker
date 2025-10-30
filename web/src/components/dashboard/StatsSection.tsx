@@ -1,5 +1,7 @@
 "use client";
 
+
+import { useRoleTheme } from "@/hooks/useRoleTheme";
 import StatsCard from "../StatsCard";
 
 export type CreatedSummary = {
@@ -27,8 +29,9 @@ export default function StatsSection({
   activeRole?: string;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
+    const { theme } = useRoleTheme();
   return (
-    <section className="grid gap-3 rounded-3xl border border-surface bg-surface-1 p-6 shadow-inner md:grid-cols-3 relative">
+    <section className={`grid gap-3 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-6 shadow-inner md:grid-cols-3 relative`}>
       {createdSummary !== null ? (
         <>
           <StatsCard label={t("dashboard.stats.createdCount")} value={createdSummary.createdCount} />

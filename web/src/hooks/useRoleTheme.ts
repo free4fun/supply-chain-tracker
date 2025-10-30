@@ -10,6 +10,6 @@ export function useRoleTheme(): { theme: RoleTheme; roleKey: keyof typeof ROLE_T
   const theme = useMemo(() => getRoleTheme(activeRole), [activeRole]);
   const roleKey = (activeRole && (ROLE_THEMES as Record<string, RoleTheme | undefined>)[activeRole]
     ? (activeRole as keyof typeof ROLE_THEMES)
-    : "Producer") as keyof typeof ROLE_THEMES;
+    : "None") as keyof typeof ROLE_THEMES;
   return { theme, roleKey };
 }

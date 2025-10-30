@@ -90,22 +90,30 @@ export function Web3Provider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
+        // Verificar si el usuario había conectado previamente (y no desconectó manualmente)
+        const wasConnected = typeof window !== "undefined" ? localStorage.getItem(LS_CONNECTED) === "1" : false;
+        
         const [accs, cid] = await Promise.all([
           eth.request({ method: "eth_accounts" }),
           readChainId(eth),
         ]);
+        
+        // Solo auto-reconectar si había una sesión activa previa
+        const shouldConnect = wasConnected && accs && accs[0];
+        
         setState(s => ({
           ...s,
           ready: true,
-          account: accs?.[0],
-          mustConnect: !(accs && accs[0]),
-          chainId: cid,
+          account: shouldConnect ? accs[0] : undefined,
+          mustConnect: !shouldConnect,
+          chainId: shouldConnect ? cid : undefined,
           error: undefined,
         }));
+        
         // Sync persisted session
         try {
           if (typeof window !== "undefined") {
-            if (accs && accs[0]) {
+            if (shouldConnect) {
               localStorage.setItem(LS_CONNECTED, "1");
               localStorage.setItem(LS_ACCOUNT, accs[0]);
               if (cid) localStorage.setItem(LS_CHAIN, String(cid));

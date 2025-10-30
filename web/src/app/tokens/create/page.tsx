@@ -14,8 +14,12 @@ import {
   getTokenBalance,
   getTokenView,
   getUserTokens,
+  getUserTransfers,
+  getTransfer,
 } from "@/lib/sc";
 import { useI18n } from "@/contexts/I18nContext";
+import { useRoleTheme } from "@/hooks/useRoleTheme";
+import { getErrorMessage } from "@/lib/errors";
 
 const JSON_SPACING = 2;
 
@@ -188,12 +192,14 @@ export default function CreateTokenPage() {
   const [suggestedParent, setSuggestedParent] = useState<bigint>(0n);
   const [pending, setPending] = useState(false);
   const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [pendingOutgoingByToken, setPendingOutgoingByToken] = useState<Record<number, bigint>>({});
 
   const { push } = useToast();
   const { account } = useWeb3();
   const { t } = useI18n();
   const { activeRole, isApproved, loading: roleLoading, isAdmin, statusLabel, company, firstName, lastName } = useRole();
   const searchParams = useSearchParams();
+  const { theme } = useRoleTheme();
 
   const roleKey = activeRole ?? (isAdmin ? "Producer" : undefined);
   const config = roleKey ? ROLE_CONFIG[roleKey] : undefined;
@@ -215,8 +221,14 @@ export default function CreateTokenPage() {
   }, [metadataMode, rawMetadata, formMetadata, identity, roleKey]);
 
   const availableInventory = useMemo(
-    () => inventory.filter(item => item.balance > 0n),
-    [inventory]
+    () => {
+      return inventory.filter(item => {
+        const reserved = pendingOutgoingByToken[item.id] ?? 0n;
+        const availableForYou = item.balance > reserved ? item.balance - reserved : 0n;
+        return availableForYou > 0n;
+      });
+    },
+    [inventory, pendingOutgoingByToken]
   );
 
   useEffect(() => {
@@ -236,15 +248,38 @@ export default function CreateTokenPage() {
     setInventoryLoading(true);
     const load = async () => {
       try {
+        // Get all token ids for the user
         const tokenIds = await getUserTokens(account);
+
+        // Build a set of token ids that were RECEIVED via accepted transfers
+        const receivedSet = new Set<number>();
+        try {
+          const txIds = await getUserTransfers(account);
+          for (const rid of txIds) {
+            try {
+              const tr = await getTransfer(Number(rid));
+              const to = String(tr[2]).toLowerCase();
+              const status = Number(tr[6]);
+              if (to === account.toLowerCase() && status === 1) {
+                receivedSet.add(Number(tr[3]));
+              }
+            } catch {}
+          }
+        } catch {}
+
         const rows: InventoryToken[] = [];
         for (const rawId of tokenIds) {
           const id = Number(rawId);
+          // Skip tokens not in the received set
+          if (!receivedSet.has(id)) continue;
           try {
             const [view, balance] = await Promise.all([
               getTokenView(id),
               getTokenBalance(id, account),
             ]);
+            // Exclude tokens that the user themselves created
+            const creator = String(view[1] ?? "").toLowerCase();
+            if (creator === account.toLowerCase()) continue;
             const bal = BigInt(balance);
             const features = String(view[5]);
             const available = BigInt(view[8] ?? view[7] ?? 0n);
@@ -262,9 +297,7 @@ export default function CreateTokenPage() {
             console.error(err);
           }
         }
-        if (!cancelled) {
-          setInventory(rows);
-        }
+        if (!cancelled) setInventory(rows);
       } finally {
         if (!cancelled) setInventoryLoading(false);
       }
@@ -274,6 +307,37 @@ export default function CreateTokenPage() {
       cancelled = true;
     };
   }, [account, config?.requiresComponents]);
+
+  // Build map of reserved amounts from pending outgoing transfers to compute per-token availability
+  useEffect(() => {
+    if (!account) {
+      setPendingOutgoingByToken({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const ids = await getUserTransfers(account);
+        const map: Record<number, bigint> = {};
+        for (const rid of ids) {
+          try {
+            const tx = await getTransfer(Number(rid));
+            const from = String(tx[1]).toLowerCase();
+            const status = Number(tx[6]);
+            if (from === account.toLowerCase() && status === 0) {
+              const tok = Number(tx[3]);
+              const amt = BigInt(tx[5]);
+              map[tok] = (map[tok] ?? 0n) + amt;
+            }
+          } catch {}
+        }
+        if (!cancelled) setPendingOutgoingByToken(map);
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [account]);
 
   // Preselect a component if query param ?from= is provided and role requires components
   useEffect(() => {
@@ -362,8 +426,11 @@ export default function CreateTokenPage() {
             push("error", "Las cantidades utilizadas deben ser mayores a cero");
             return;
           }
-          if (amount > selected.balance) {
-            push("error", `Solo tenés ${selected.balance.toString()} unidades disponibles del token #${row.tokenId}`);
+          // Guard considering reservations from pending outgoing transfers
+          const reserved = pendingOutgoingByToken[row.tokenId] ?? 0n;
+          const availableForYou = selected.balance > reserved ? selected.balance - reserved : 0n;
+          if (amount > availableForYou) {
+            push("error", t("transfers.errors.insufficientAvailable"));
             return;
           }
           components.push({ tokenId: BigInt(row.tokenId), amount });
@@ -371,6 +438,19 @@ export default function CreateTokenPage() {
         if (components.length === 0) {
           push("error", "Indicá qué tokens vas a transformar y en qué cantidades");
           return;
+        }
+
+        // Enforce contract rule: the first component must match the suggested parent when present
+        if (suggestedParent && suggestedParent !== 0n) {
+          const idx = components.findIndex(c => c.tokenId === suggestedParent);
+          if (idx === -1) {
+            push("error", t("tokens.create.errors.parentRequired", { id: suggestedParent.toString() }));
+            return;
+          }
+          if (idx > 0) {
+            const [parentComp] = components.splice(idx, 1);
+            components.unshift(parentComp);
+          }
         }
       }
 
@@ -397,9 +477,12 @@ export default function CreateTokenPage() {
         }
         setRawMetadata(metadataPayload);
       } catch (err: unknown) {
-        console.error(err);
-        const message = err instanceof Error ? err.message : "No se pudo crear el token";
-        push("error", message);
+        const message = getErrorMessage(err, "No se pudo crear el token");
+        if (message) {
+          console.error(err);
+          push("error", message);
+        }
+        // Silently ignore user cancellations (message will be null)
       } finally {
         setPending(false);
         // Refresh inventory after creation to reflect consumed balances
@@ -455,7 +538,7 @@ export default function CreateTokenPage() {
   }
 
   return (
-  <div className={`space-y-6 rounded-[28px] border border-surface ${config.background} p-6 shadow-xl shadow-black/5`}> 
+  <div className={`space-y-6 rounded-[28px] border ${theme.accentBorder} ${theme.background} p-6 shadow-xl shadow-black/5`}>
       <header className={`rounded-3xl bg-gradient-to-r ${config.gradient} px-6 py-5 text-white shadow-lg`}> 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -472,7 +555,7 @@ export default function CreateTokenPage() {
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-  <section className={`rounded-3xl border border-surface bg-surface-1 p-5 shadow-inner`}> 
+  <section className={`rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-5 shadow-inner`}>
           <h2 className="text-lg font-semibold text-slate-800">Detalles del nuevo token</h2>
           <p className="text-sm text-slate-500">Completá la información del activo que vas a registrar para mantener la trazabilidad completa.</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -508,7 +591,7 @@ export default function CreateTokenPage() {
           </div>
         </section>
 
-  <section className={`rounded-3xl border border-surface bg-surface-1 p-5 shadow-inner`}> 
+  <section className={`rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-5 shadow-inner`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-slate-800">Características del lote</h2>
@@ -563,7 +646,7 @@ export default function CreateTokenPage() {
         </section>
 
         {config.requiresComponents ? (
-          <section className={`rounded-3xl border border-surface bg-surface-1 p-5 shadow-inner space-y-4`}>
+          <section className={`rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-5 shadow-inner space-y-4`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-slate-800">{config.componentLabel}</h2>
@@ -621,8 +704,21 @@ export default function CreateTokenPage() {
                     {row.tokenId ? (
                       <div className="md:col-span-3 rounded-2xl border border-surface bg-surface-2 p-3 text-xs text-slate-600">
                         <p className="font-semibold">Resumen del token #{row.tokenId}</p>
-                        <p>Saldo disponible: {formatBigInt(availableInventory.find(item => item.id === row.tokenId)?.balance ?? 0n)}</p>
-                        <p>Disponible para transformar: {formatBigInt(availableInventory.find(item => item.id === row.tokenId)?.availableSupply ?? 0n)}</p>
+                        {(() => {
+                          const item = availableInventory.find(i => i.id === row.tokenId);
+                          const bal = item?.balance ?? 0n;
+                          const reserved = pendingOutgoingByToken[row.tokenId] ?? 0n;
+                          const availableForYou = bal > reserved ? bal - reserved : 0n;
+                          return (
+                            <>
+                              <p>Tu saldo: {formatBigInt(bal)}</p>
+                              {reserved > 0n ? (
+                                <p>Reservado en envíos pendientes: {formatBigInt(reserved)}</p>
+                              ) : null}
+                              <p>Disponible para transformar: {formatBigInt(availableForYou)}</p>
+                            </>
+                          );
+                        })()}
                       </div>
                     ) : null}
                   </div>

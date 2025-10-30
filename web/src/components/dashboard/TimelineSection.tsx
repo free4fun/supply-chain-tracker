@@ -2,6 +2,7 @@
 
 import React from "react";
 import Timeline from "@/components/Timeline";
+import { useRoleTheme } from "@/hooks/useRoleTheme";
 
 export default function TimelineSection({
   t,
@@ -17,10 +18,11 @@ export default function TimelineSection({
   barColor: string;
 }) {
   const total = counts.length ? counts.reduce((a, b) => a + b, 0) : 0;
+  const { theme } = useRoleTheme();
   return (
-    <section className="space-y-3 rounded-3xl border border-surface bg-surface-1 p-5 shadow-inner">
+    <section className={`space-y-3 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-5 shadow-inner`}>
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{t("dashboard.activity.timeline")}</h3>
+        <h2 className="text-sm text-slate-700 dark:text-slate-300">{t("dashboard.activity.timeline")}</h2>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-full border border-surface overflow-hidden text-xs">
             <button onClick={() => setMode('count')} className={`px-2 py-0.5 ${mode === 'count' ? 'bg-surface-3 font-semibold' : ''}`}>{t('dashboard.activity.mode.count')}</button>

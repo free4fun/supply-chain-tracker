@@ -413,11 +413,10 @@ contract SupplyChain {
         } else {
             require(inputIds.length == inputAmounts.length, "Inputs mismatch");
             require(inputIds.length > 0, "Inputs required");
-            uint256 suggested = _resolveParentId(role);
-            parentId = inputIds[0];
-            if (suggested != 0) {
-                require(suggested == parentId, "Parent mismatch");
-            }
+            // Anchor lineage to the last received token suggested for this user.
+            // No need to force array ordering; we record the enforced parent independently.
+            uint256 suggested = _resolveParentId(role); // reverts if not assigned
+            parentId = suggested;
         }
 
         uint256 tokenId = nextTokenId++;
@@ -461,8 +460,8 @@ contract SupplyChain {
                 tokenInputs[tokenId].push(Component({ tokenId: componentId, amount: amount }));
             }
 
-            // After transformation the new asset becomes the suggested parent for the creator
-            suggestedParentByUser[msg.sender] = tokenId;
+            // Keep suggested parent anchored to the last received token;
+            // do not override it with the newly created token to avoid forcing self-anchoring.
         }
 
         emit TokenCreated(tokenId, msg.sender, name, description, totalSupply, features, parentId);

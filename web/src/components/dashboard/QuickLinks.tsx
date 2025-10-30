@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { RoleTheme } from "@/lib/roleTheme";
+import type { RoleTheme } from "../../lib/roleTheme";
 
 const ROLE_LINKS: Record<string, { href: string; labelKey: string }[]> = {
     Producer: [
@@ -33,27 +33,10 @@ export default function QuickLinks({
     t: (key: string) => string;
 }) {
     return (
-        <section className="space-y-3 rounded-3xl border border-surface bg-surface-1 p-6 shadow-inner">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{t("dashboard.activity.timeline")}</h3>
+        <section className={`space-y-3 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-6 shadow-inner`}>
+            <h2 className="text-sm text-slate-700 dark:text-slate-300">{t("dashboard.activity.timeline")}</h2>
             <div className="flex flex-wrap items-center gap-2">
-                {activeRole && ROLE_LINKS[activeRole] ? (
-                    ROLE_LINKS[activeRole].map((link) => (
-                        <Link
-                            key={link.href}
-                            href={link.href}
-                            className={`rounded-full bg-gradient-to-r ${theme.gradient} px-4 py-2 text-xs font-semibold !text-white shadow-md transition hover:brightness-110 focus-outline-accent`}
-                        >
-                            {t(link.labelKey)}
-                        </Link>
-                    ))
-                ) : (
-                    <Link
-                        href="/tokens/create"
-                        className={`rounded-full bg-gradient-to-r ${theme.gradient} px-4 py-2 text-xs font-semibold !text-white shadow-md transition hover:brightness-110 focus-outline-accent`}
-                    >
-                        {t("dashboard.quickLinks.createToken")}
-                    </Link>
-                )}
+               
             </div>
         </section>
     );
