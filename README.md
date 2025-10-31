@@ -1,6 +1,8 @@
 # Supply Chain Tracker
 
 Supply Chain Tracker is a full-stack reference platform for following goods across every stage of a supply chain. The repository bundles the smart contracts, a The Graph subgraph, and a Next.js dashboard so that each layer can be iterated together.
+## Presentacion Video
+[https://drive.google.com/file/d/1xzv5htO7bDXrXigp_b0uRBEV5LJjJ4q9/view?usp=sharing](https://drive.google.com/file/d/1xzv5htO7bDXrXigp_b0uRBEV5LJjJ4q9/view?usp=sharing)
 
 ## Repository layout
 
