@@ -6,6 +6,7 @@ import TokenDetailModal from "@/components/TokenDetailModal";
 import { getTokenDetail } from "@/lib/tokenDetail";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { TokenTxHash } from "@/components/TokenTxHash";
+import { useRoleTheme } from "@/hooks/useRoleTheme";
 
 function formatDate(ts: number): string {
   if (!ts) return "-";
@@ -34,9 +35,10 @@ export type RecentItem =
 
 export default function RecentTransfers({ items, t }: { items: RecentItem[]; t: (k: string, p?: Record<string, string | number>) => string }) {
   const { account } = useWeb3();
+  const { theme } = useRoleTheme();
   const [modalTokenId, setModalTokenId] = useState<number | null>(null);
   return (
-    <section className="space-y-3 rounded-3xl border border-surface bg-white dark:bg-slate-900 p-5 shadow-inner">
+    <section className={`space-y-3 rounded-3xl border bg-white dark:bg-slate-900 p-5 shadow-inner ${theme.containerBorder}`}>
       <div className="flex items-center justify-between">
         <h2 className="text-sm text-slate-700 dark:text-slate-300">{t("dashboard.activity.title")}</h2>
         <span className="rounded-full border border-surface px-2 py-0.5 text-[10px] font-semibold">{items.length}</span>
@@ -71,20 +73,18 @@ export default function RecentTransfers({ items, t }: { items: RecentItem[]; t: 
                 <li 
                   key={`tr-${it.id}`}
                   onClick={() => setModalTokenId(it.tokenId)}
-                  className="rounded-xl border border-surface bg-surface-2 p-3 text-sm hover:bg-surface-3 cursor-pointer"
+                  className={`rounded-xl border bg-surface-2 p-3 text-sm hover:bg-surface-3 cursor-pointer transition ${theme.cardBorder} ${theme.cardHoverBorder} ${theme.cardHoverShadow}`}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-semibold">
-                        #{it.tokenId} · {it.tokenName ?? `Token ${it.tokenId}`} · {it.amount.toString()}
-                      </p>
-                      <div className="mt-1">
-                        <TokenTxHash tokenId={it.tokenId} chainId={31337} />
-                      </div>
-                      <p className="text-xs mt-1 text-slate-500">{dir} · {formatDate(it.dateCreated)}</p>
-                    </div>
-                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusClass}`}>{statusLabel}</span>
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <p className="font-semibold">
+                      #{it.tokenId} · {it.tokenName ?? `Token ${it.tokenId}`} · {it.amount.toString()}
+                    </p>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold flex-shrink-0 ${statusClass}`}>{statusLabel}</span>
                   </div>
+                  <div className="mb-2">
+                    <TokenTxHash tokenId={it.tokenId} chainId={31337} showFull={true} className="text-xs" />
+                  </div>
+                  <p className="text-xs text-slate-500">{dir} · {formatDate(it.dateCreated)}</p>
                 </li>
               );
             } else {
@@ -93,22 +93,20 @@ export default function RecentTransfers({ items, t }: { items: RecentItem[]; t: 
                 <li 
                   key={`cr-${it.id}`}
                   onClick={() => setModalTokenId(it.tokenId)}
-                  className="rounded-xl border border-surface bg-surface-2 p-3 text-sm hover:bg-surface-3 cursor-pointer"
+                  className={`rounded-xl border bg-surface-2 p-3 text-sm hover:bg-surface-3 cursor-pointer transition ${theme.cardBorder} ${theme.cardHoverBorder} ${theme.cardHoverShadow}`}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-semibold">
-                        #{it.tokenId} · {it.tokenName ?? `Token ${it.tokenId}`} · {it.totalSupply.toString()}
-                      </p>
-                      <div className="mt-1">
-                        <TokenTxHash tokenId={it.tokenId} chainId={31337} />
-                      </div>
-                      <p className="text-xs mt-1 text-slate-500">{t("dashboard.activity.created")} · {formatDate(it.dateCreated)}</p>
-                    </div>
-                    <span className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:border-sky-500 dark:bg-sky-950 dark:text-sky-300">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <p className="font-semibold">
+                      #{it.tokenId} · {it.tokenName ?? `Token ${it.tokenId}`} · {it.totalSupply.toString()}
+                    </p>
+                    <span className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:border-sky-500 dark:bg-sky-950 dark:text-sky-300 flex-shrink-0">
                       {t("dashboard.activity.badge.created")}
                     </span>
                   </div>
+                  <div className="mb-2">
+                    <TokenTxHash tokenId={it.tokenId} chainId={31337} showFull={true} className="text-xs" />
+                  </div>
+                  <p className="text-xs text-slate-500">{t("dashboard.activity.created")} · {formatDate(it.dateCreated)}</p>
                 </li>
               );
             }

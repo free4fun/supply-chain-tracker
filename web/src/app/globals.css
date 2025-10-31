@@ -95,6 +95,8 @@ body.theme-admin { --accent: #b91c1c; --accent-2: #dc2626; }
 .hover\:text-accent:hover { color: var(--accent); }
 .border-accent { border-color: var(--accent); }
 .hover\:border-accent:hover { border-color: var(--accent); }
+.border-accent-2 { border-color: var(--accent-2); }
+.focus\:border-accent-2:focus { border-color: var(--accent-2); }
 
 .btn-primary {
   background-image: linear-gradient(to right, var(--accent), var(--accent-2));
@@ -115,4 +117,9 @@ h2,
 h2.font-semibold,
 body h2 {
   font-weight: 600 !important;
+}
+
+/* Remove text cursor from non-input elements */
+h1, h2, h3, h4, h5, h6, p, span {
+  cursor: default;
 }

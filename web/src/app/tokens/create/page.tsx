@@ -564,7 +564,7 @@ export default function CreateTokenPage() {
   // Admin privileges do not bypass on-chain approval checks.
   if (!roleLoading && !isApproved) {
     return (
-      <div className="rounded-3xl border border-amber-300/60 bg-amber-50/80 p-6 text-sm text-amber-900 shadow-sm">
+      <div className="rounded-3xl border border-amber-300/60 bg-amber-50/80 p-6 text-sm text-amber-900 shadow-sm cursor-default">
         <p className="font-semibold">{t("tokens.create.notApprovedTitle")}</p>
         <p>{t("tokens.create.notApprovedBody", { status: statusLabel ?? t("common.status.none") })}</p>
       </div>
@@ -573,32 +573,27 @@ export default function CreateTokenPage() {
 
   if (!canCreate || !config) {
     return (
-      <div className="rounded-3xl border border-surface bg-surface-1 p-6 text-sm text-slate-600 shadow-inner dark:text-slate-300">
+      <div className="rounded-3xl border border-surface bg-surface-1 p-6 text-sm text-slate-600 shadow-inner dark:text-slate-300 cursor-default">
         Solo los roles productivos (Viticultor, Bodega y Distribuidor) pueden crear nuevos tokens.
       </div>
     );
   }
 
   return (
-  <div className={`space-y-6 rounded-[28px] border ${theme.accentBorder} ${theme.background} p-6 shadow-xl shadow-black/5`}>
+  <div className={`space-y-6 rounded-[28px] border ${theme.containerBorder} ${theme.background} p-6 shadow-xl shadow-black/5`}>
       <header className={`rounded-3xl bg-gradient-to-r ${config.gradient} px-6 py-5 text-white shadow-lg`}> 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm uppercase tracking-[0.35em] opacity-80">{config.label}</p>
             <h1 className="text-2xl font-semibold">{config.icon} {config.title}</h1>
-            <p className="mt-2 max-w-3xl text-sm opacity-90">{config.description}</p>
-          </div>
-          <div className="rounded-2xl bg-white/15 px-4 py-3 text-sm">
-            <p className="font-semibold">Identidad registrada</p>
-            <p>{identity.company || "Empresa sin registrar"}</p>
-            <p>{identity.contact || "Sin contacto"}</p>
+            <p className="mt-2 max-w-4xl text-sm opacity-90">{config.description}</p>
           </div>
         </div>
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-  <section className={`rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-5 shadow-inner`}>
-          <h2 className="text-lg font-semibold text-slate-800">Detalles del nuevo token</h2>
+        <section className={`rounded-3xl border ${theme.containerBorder} bg-white dark:bg-slate-900 p-5 shadow-inner`}>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 cursor-default">Detalles del nuevo token</h2>
           <p className="text-sm text-slate-500">Completá la información del activo que vas a registrar para mantener la trazabilidad completa.</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-600">
@@ -606,7 +601,7 @@ export default function CreateTokenPage() {
               <input
                 value={name}
                 onChange={event => setName(event.target.value)}
-                className="rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+                className="rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm shadow-sm hover:border-accent focus:border-accent-2 focus-visible:outline-none"
                 placeholder="Ej: Lote de uvas Malbec"
               />
             </label>
@@ -615,7 +610,7 @@ export default function CreateTokenPage() {
               <input
                 value={supply}
                 onChange={event => setSupply(event.target.value)}
-                className="rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+                className="rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm shadow-sm hover:border-accent focus:border-accent-2 focus-visible:outline-none"
                 type="number"
                 min={0}
               />
@@ -625,7 +620,7 @@ export default function CreateTokenPage() {
               <textarea
                 value={description}
                 onChange={event => setDescription(event.target.value)}
-                className="rounded-2xl border border-surface bg-surface-2 px-3 py-2 text-sm shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+                className="rounded-2xl border border-surface bg-surface-2 px-3 py-2 text-sm shadow-sm hover:border-accent focus:border-accent-2 focus-visible:outline-none"
                 rows={3}
                 placeholder="Anotaciones adicionales del lote"
               />
@@ -633,16 +628,16 @@ export default function CreateTokenPage() {
           </div>
         </section>
 
-  <section className={`rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-5 shadow-inner`}>
+  <section className={`rounded-3xl border ${theme.containerBorder} bg-white dark:bg-slate-900 p-5 shadow-inner`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-slate-800">Características del lote</h2>
+              <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 cursor-default">Características del lote</h2>
               <p className="text-sm text-slate-500">Podés completar el formulario sugerido o pegar tu JSON personalizado.</p>
             </div>
             <button
               type="button"
               onClick={() => setMetadataMode(mode => (mode === "form" ? "json" : "form"))}
-              className="rounded-full border border-surface px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-emerald-400 hover:text-emerald-600"
+              className="rounded-full border px-3 py-1 text-xs font-semibold transition border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-accent hover:text-accent hover:shadow-md hover:shadow-accent/20"
             >
               {metadataMode === "form" ? "Usar JSON crudo" : "Volver al formulario"}
             </button>
@@ -662,7 +657,7 @@ export default function CreateTokenPage() {
                       }))
                     }
                     type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
-                    className="rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+                    className="rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm shadow-sm hover:border-accent focus:border-accent-2 focus-visible:outline-none"
                     placeholder={field.placeholder}
                   />
                   {field.helper ? <span className="text-xs font-normal text-slate-400">{field.helper}</span> : null}
@@ -673,7 +668,7 @@ export default function CreateTokenPage() {
             <textarea
               value={rawMetadata}
               onChange={event => setRawMetadata(event.target.value)}
-              className="mt-4 w/full rounded-2xl border border-surface bg-slate-950/90 px-4 py-3 font-mono text-xs text-slate-100 shadow-inner focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+              className="mt-4 w-full rounded-2xl border border-surface bg-surface-2 px-4 py-3 font-mono text-xs text-slate-800 dark:text-slate-200 shadow-inner hover:border-accent focus:border-accent-2 focus-visible:outline-none"
               rows={10}
               spellCheck={false}
             />
@@ -681,23 +676,23 @@ export default function CreateTokenPage() {
 
           <div className="mt-4">
             <h3 className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Vista previa JSON</h3>
-            <pre className="mt-2 max-h-56 overflow-auto rounded-2xl border border-surface bg-slate-900/95 p-4 text-xs text-emerald-100 shadow-inner">
+            <pre className="mt-2 max-h-56 overflow-auto rounded-2xl border border-surface bg-surface-2 p-4 font-mono text-xs text-slate-800 dark:text-slate-200 shadow-inner cursor-default">
               {metadataPreview}
             </pre>
           </div>
         </section>
 
         {config.requiresComponents ? (
-          <section className={`rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-5 shadow-inner space-y-4`}>
+          <section className={`rounded-3xl border ${theme.containerBorder} bg-white dark:bg-slate-900 p-5 shadow-inner space-y-4`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-slate-800">{config.componentLabel}</h2>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 cursor-default">{config.componentLabel}</h2>
                 <p className="text-sm text-slate-500">Seleccioná los tokens que vas a consumir para crear este nuevo activo.</p>
               </div>
               <button
                 type="button"
                 onClick={addRow}
-                className="rounded-full border border-surface px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-emerald-400 hover:text-emerald-600"
+                className="rounded-full border px-3 py-1 text-xs font-semibold transition border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-accent hover:text-accent hover:shadow-md hover:shadow-accent/20"
               >
                 Agregar token
               </button>
@@ -706,17 +701,17 @@ export default function CreateTokenPage() {
             {inventoryLoading ? (
               <p className="text-sm text-slate-500">Cargando inventario…</p>
             ) : availableInventory.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-surface bg-surface-2 p-4 text-sm text-slate-500">{config.emptyInventory}</p>
+              <p className="rounded-2xl border border-dashed border-surface bg-surface-2 p-4 text-sm text-slate-500 cursor-default">{config.emptyInventory}</p>
             ) : (
               <div className="grid gap-4">
                 {inputs.map((row, index) => (
-                  <div key={index} className={`grid gap-3 rounded-2xl border border-surface ${config.accentMuted} p-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]`}>
+                  <div key={index} className={`grid gap-3 rounded-2xl border border-surface ${config.accentMuted} p-4 md:grid-cols-[2fr_1fr_auto]`}>
                     <label className="flex flex-col gap-1 text-sm font-medium text-slate-600">
                       Token a transformar
                       <select
                         value={row.tokenId ?? ""}
                         onChange={event => updateInputRow(index, { tokenId: event.target.value ? Number(event.target.value) : null })}
-                        className="rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+                        className="rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm shadow-sm hover:border-accent focus:border-accent-2 focus-visible:outline-none"
                       >
                         <option value="">Seleccioná un token…</option>
                         {availableInventory.map(item => (
@@ -733,13 +728,13 @@ export default function CreateTokenPage() {
                         onChange={event => updateInputRow(index, { amount: event.target.value })}
                         type="number"
                         min={0}
-                        className="rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+                        className="rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm shadow-sm hover:border-accent focus:border-accent-2 focus-visible:outline-none"
                       />
                     </label>
                     <button
                       type="button"
                       onClick={() => removeRow(index)}
-                      className="self-end rounded-full border border-surface px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-rose-400 hover:text-rose-500"
+                      className="self-end rounded-full border px-3 py-2 text-xs font-semibold transition border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-rose-500 hover:text-rose-500 hover:shadow-md hover:shadow-rose-200/30"
                     >
                       Quitar
                     </button>
@@ -752,7 +747,7 @@ export default function CreateTokenPage() {
                           <p className="font-semibold">Resumen del token #{row.tokenId}</p>
                         </div>
                         <div className="mt-1">
-                          <TokenTxHash tokenId={row.tokenId} chainId={31337} />
+                          <TokenTxHash tokenId={row.tokenId} chainId={31337} className="text-xs" />
                         </div>
                         {(() => {
                           const item = availableInventory.find(i => i.id === row.tokenId);
@@ -791,7 +786,7 @@ export default function CreateTokenPage() {
           <button
             type="submit"
             disabled={pending || (config.requiresComponents && availableInventory.length === 0)}
-            className="rounded-full bg-slate-900 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition hover:bg-slate-800 disabled:opacity-60"
+            className={`rounded-full px-6 py-2 text-sm font-semibold transition disabled:opacity-60 ${theme.btnPrimary}`}
           >
             {pending ? "Registrando…" : "Registrar token"}
           </button>

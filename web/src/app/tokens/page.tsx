@@ -82,8 +82,9 @@ function formatBigInt(value: bigint): string {
 }
 
 function MetadataPanel({ metadata }: { metadata: Record<string, unknown> | null }) {
+  const { t } = useI18n();
   if (!metadata || Object.keys(metadata).length === 0) {
-    return <p className="text-sm text-slate-500">Sin información adicional para este token.</p>;
+    return <p className="text-sm text-slate-500">{t("common.noMetadata")}</p>;
   }
   return (
     <dl className="grid gap-3 md:grid-cols-2">
@@ -98,46 +99,60 @@ function MetadataPanel({ metadata }: { metadata: Record<string, unknown> | null 
 }
 
 function TraceTree({ node, depth = 0, onTokenClick }: { node: TraceNode; depth?: number; onTokenClick: (id: number) => void }) {
+  const { theme } = useRoleTheme();
+  const { t } = useI18n();
+  
   return (
     <li className="relative pl-6">
       {depth > 0 ? (
         <span className="absolute left-0 top-3 h-full border-l-2 border-surface" aria-hidden />
       ) : null}
-      <button
+      <div
         onClick={() => onTokenClick(node.detail.id)}
-        className="w-full text-left rounded-2xl border border-surface bg-surface-2 p-4 shadow-sm hover:bg-surface-3 hover:border-indigo-400 transition cursor-pointer"
+        className={`group w-full text-left rounded-2xl border px-4 py-4 shadow-sm transition cursor-pointer bg-surface-2 hover:bg-surface-3 ${theme.cardBorder} ${theme.cardHoverBorder} ${theme.cardHoverShadow} space-y-3`}
       >
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="space-y-2">
           <div>
             <p className="text-sm font-semibold text-slate-800">#{node.detail.id} · {node.detail.name}</p>
-            <p className="text-xs text-slate-500">{node.detail.description || "Sin descripción"}</p>
+            {node.detail.description ? (
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">{node.detail.description}</p>
+            ) : null}
           </div>
-            <div className="text-right text-xs text-slate-500">
-              <p>Disponible global: {formatBigInt(node.detail.availableSupply)}</p>
-              <p>Creado: {node.detail.createdAt ? new Date(node.detail.createdAt * 1000).toLocaleString("en-US", { timeZone: "UTC" }) : "-"}</p>
+          <div>
+            <TokenTxHash tokenId={node.detail.id} chainId={31337} showFull={true} className="text-xs text-slate-700 dark:text-slate-300" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div className="rounded-xl border border-slate-200/60 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{t("tokens.detail.availableGlobal")}</p>
+            <p className="text-sm font-medium text-slate-700 mt-1">{formatBigInt(node.detail.availableSupply)}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200/60 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{t("tokens.detail.creationDate")}</p>
+            <p className="text-sm font-medium text-slate-700 mt-1">{node.detail.createdAt ? new Date(node.detail.createdAt * 1000).toLocaleString("es-AR", { timeZone: "UTC" }) : "-"}</p>
           </div>
         </div>
         {typeof node.amount !== "undefined" ? (
-          <p className="mt-2 rounded-xl bg-surface-2 px-3 py-1 text-xs font-medium text-slate-600">
-            Cantidad utilizada: {formatBigInt(node.amount)}
+          <p className="rounded-xl border border-slate-200/60 px-3 py-2 text-xs font-medium text-slate-600">
+            {t("tokens.detail.usedAmount", { amount: formatBigInt(node.amount) })}
           </p>
         ) : null}
         {node.detail.metadata ? (
-          <div className="mt-3 text-xs text-slate-600">
-            <p className="font-semibold">Datos principales</p>
-            <div className="mt-1 grid gap-1 md:grid-cols-2">
+          <div className="text-xs text-slate-600">
+            <p className="font-semibold mb-2">{t("tokens.detail.mainData")}</p>
+            <div className="grid gap-2 md:grid-cols-2">
               {Object.entries(node.detail.metadata)
                 .slice(0, 4)
                 .map(([key, value]) => (
-                  <div key={key} className="rounded-xl bg-surface-2 px-3 py-2">
-                    <span className="block text-[10px] uppercase tracking-[0.3em] text-slate-400">{formatKey(key)}</span>
-                    <span className="text-xs text-slate-700">{formatValue(value)}</span>
+                  <div key={key} className="rounded-xl border border-slate-200/60 px-3 py-2">
+                    <span className="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{formatKey(key)}</span>
+                    <span className="text-xs text-slate-700 mt-1 block">{formatValue(value)}</span>
                   </div>
                 ))}
             </div>
           </div>
         ) : null}
-      </button>
+      </div>
       {node.children.length ? (
         <ul className="mt-3 space-y-3">
           {node.children.map((child, idx) => (
@@ -313,8 +328,8 @@ export default function TokensPage() {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm uppercase tracking-[0.35em] opacity-80">{theme.label}</p>
-            <h1 className="text-2xl font-semibold">{theme.icon} Tokens disponibles</h1>
-            <p className="mt-2 max-w-3xl text-sm opacity-90">{theme.intro}</p>
+            <h1 className="text-2xl font-semibold">{theme.icon} {t("tokens.pageTitle")}</h1>
+            <p className="mt-2 max-w-4xl text-sm opacity-90">{theme.intro}</p>
           </div>
           <button
             type="button"
@@ -327,9 +342,9 @@ export default function TokensPage() {
         </div>
       </header>
 
-      <div className="grid gap-6 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]">
-        <aside className={`space-y-4 rounded-3xl border ${theme.accentBorder} bg-surface-1 p-5 shadow-inner`}>
-          <h2 className="text-sm font-semibold text-slate-700">Mis tokens</h2>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className={`space-y-4 rounded-3xl border bg-surface-1 p-5 shadow-inner ${theme.containerBorder}`}>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t("tokens.myTokens")}</h2>
           {tokens.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-surface bg-surface-2 p-4 text-sm text-slate-500">{theme.empty}</p>
           ) : (
@@ -338,64 +353,82 @@ export default function TokensPage() {
                 const isActive = selectedId === token.id;
                 return (
                   <div key={token.id} className="relative">
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedId(token.id); setModalTokenId(token.id); }}
-                      className={`w-full rounded-2xl border px-4 py-3 text-left shadow-sm transition cursor-pointer ${
+                    <div
+                      onClick={() => setSelectedId(token.id)}
+                      className={`w-full rounded-2xl px-4 py-3 text-left shadow-sm transition cursor-pointer ${
                         isActive
-                          ? `border-transparent bg-gradient-to-r ${theme.gradient} text-white`
-                          : `${theme.accentBorder} bg-surface-2 text-slate-700 hover:border-accent`
+                          ? `bg-gradient-to-r ${theme.gradient} text-white shadow-md`
+                          : `border bg-surface-2 hover:bg-surface-3 text-slate-700 dark:text-slate-200 ${theme.cardBorder} ${theme.cardHoverBorder} ${theme.cardHoverShadow}`
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold">#{token.id} · {token.name}</p>
-                          <div className="mt-1">
-                            <TokenTxHash tokenId={token.id} chainId={31337} />
-                          </div>
-                          <p className={`text-xs mt-1 ${isActive ? "text-white/80" : "text-slate-500"}`}>
-                            {token.description || "Sin descripción"}
-                          </p>
-                        </div>
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <p className="text-sm font-semibold">#{token.id} · {token.name}</p>
                         <div className="text-right">
-                          <p className="text-sm font-semibold">Saldo: {formatBigInt(token.balance)}</p>
-                          <p className={`text-xs ${isActive ? "text-white/80" : "text-slate-500"}`}>
-                            Disponible global: {formatBigInt(token.availableSupply)}
+                          <p className="text-sm font-semibold whitespace-nowrap">{t("tokens.detail.balance")}: {formatBigInt(token.balance)}</p>
+                          <p className={`text-xs whitespace-nowrap ${isActive ? "text-white/80" : "text-slate-500"}`}>
+                            {t("tokens.detail.availableGlobal")}: {formatBigInt(token.availableSupply)}
                           </p>
                         </div>
                       </div>
-                    </button>
+                      <div className="mb-2">
+                        <TokenTxHash 
+                          tokenId={token.id} 
+                          chainId={31337} 
+                          showFull={true} 
+                          className={`text-xs font-semibold ${isActive ? 'text-white/90' : 'text-slate-800 dark:text-slate-100'}`} 
+                        />
+                      </div>
+                      <p className={`text-xs ${isActive ? "text-white/80" : "text-slate-500"}`}>
+                        {token.description || t("tokens.detail.noDescriptionShort")}
+                      </p>
+                    </div>
                   </div>
                 );
               })}
             </div>
           )}
-        </aside>
+        </div>
 
-        <section className={`space-y-5 rounded-3xl border ${theme.accentBorder} bg-surface-1 p-6 shadow-inner`}>
+        <div className={`space-y-5 rounded-3xl border bg-surface-1 p-6 shadow-inner ${theme.containerBorder}`}>
           {selectedId && trace ? (
             <div className="space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="space-y-3">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-800">#{trace.detail.id} · {trace.detail.name}</h2>
-                  <p className="text-sm text-slate-500">{trace.detail.description || "Sin descripción"}</p>
+                  <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200">#{trace.detail.id} · {trace.detail.name}</h2>
+                  <div className="mt-1">
+                    <TokenTxHash tokenId={trace.detail.id} chainId={31337} showFull={true} className="text-sm font-semibold text-slate-800 dark:text-slate-100" />
+                  </div>
                 </div>
-                <div className="text-right text-xs text-slate-500">
-                  <p>Saldo actual: {formatBigInt(trace.detail.balance)}</p>
-                  <p>Disponible global: {formatBigInt(trace.detail.availableSupply)}</p>
-                  <p>Creado: {trace.detail.createdAt ? new Date(trace.detail.createdAt * 1000).toLocaleString("en-US", { timeZone: "UTC" }) : "-"}</p>
+                {trace.detail.description && (
+                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{trace.detail.description}</p>
+                )}
+                <div className="grid grid-cols-3 gap-3 pt-2">
+                  <div className="rounded-xl bg-surface-2 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t("tokens.detail.currentBalance")}</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{formatBigInt(trace.detail.balance)}</p>
+                  </div>
+                  <div className="rounded-xl bg-surface-2 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t("tokens.detail.available")}</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{formatBigInt(trace.detail.availableSupply)}</p>
+                  </div>
+                  <div className="rounded-xl bg-surface-2 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t("tokens.detail.created")}</p>
+                    <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                      {trace.detail.createdAt ? new Date(trace.detail.createdAt * 1000).toLocaleDateString("es-AR", { timeZone: "UTC" }) : "-"}
+                    </p>
+                  </div>
                 </div>
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-700">Características</h3>
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{t("tokens.detail.characteristics")}</h3>
                 <MetadataPanel metadata={trace.detail.metadata} />
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-700">Cadena de trazabilidad</h3>
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{t("tokens.detail.traceability")}</h3>
                 <p className="text-xs text-slate-500">
-                  Cada nivel muestra los tokens origen y las cantidades utilizadas para crear el activo seleccionado. Hacé click en cualquier token para ver sus detalles completos.
+                  {t("tokens.detail.traceabilityDescription")}
                 </p>
                 <ul className="mt-3 space-y-3">
                   <TraceTree node={trace} onTokenClick={(id) => setModalTokenId(id)} />
@@ -403,9 +436,9 @@ export default function TokensPage() {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Seleccioná un token de la lista para ver sus detalles.</p>
+            <p className="text-sm text-slate-500">{t("tokens.detail.selectToken")}</p>
           )}
-        </section>
+        </div>
       </div>
 
       <TokenDetailModal

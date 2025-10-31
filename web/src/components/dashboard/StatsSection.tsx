@@ -31,7 +31,7 @@ export default function StatsSection({
 }) {
     const { theme } = useRoleTheme();
   return (
-    <section className={`grid gap-3 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-6 shadow-inner md:grid-cols-3 relative`}>
+    <section className={`grid gap-3 rounded-3xl border bg-white dark:bg-slate-900 p-6 shadow-inner md:grid-cols-3 relative ${theme.containerBorder}`}>
       {createdSummary !== null ? (
         <>
           <StatsCard label={t("dashboard.stats.createdCount")} value={createdSummary.createdCount} />

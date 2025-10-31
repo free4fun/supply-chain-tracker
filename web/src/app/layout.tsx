@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <RoleProvider>
                 <ThemeController />
                 <ChainGuard>
-                  <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+                  <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
                     <Nav />
                     <ConnectBanner />
                     <RedeployBanner />

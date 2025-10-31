@@ -10,7 +10,7 @@ CHAIN_ID="${CHAIN_ID:-31337}"
 PORT="${PORT:-8545}"
 ANVIL_BIN="${ANVIL_BIN:-anvil}"
 ACCOUNTS="${ACCOUNTS:-10}"
-MNEMONIC="${MNEMONIC:-test test test test test test test test test test test junk}"
+MNEMONIC="${MNEMONIC:-}"  # prefer to load from sc/.env.local
 DERIVATION_PATH=${DERIVATION_PATH:-$'m/44\'/60\'/0\'/0/'}   # base path (MetaMask default)
 DERIVATION_PATH_TX=${DERIVATION_PATH_TX:-$'m/44\'/60\'/0\'/0/0'} # tx path for deployer (account 0)
 PK="${PK:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}"  # anvil[0]
@@ -26,6 +26,20 @@ sc_dir="$root_dir/sc"
 web_dir="$root_dir/web"
 logfile="$root_dir/.anvil.log"
 web_logfile="$root_dir/.web.log"
+
+# Load secrets from sc/.env.local if present (exports variables)
+if [[ -f "$sc_dir/.env.local" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$sc_dir/.env.local"
+  set +a
+fi
+
+# Ensure MNEMONIC is set when using mnemonic flow
+if [[ "$USE_MNEMONIC" = "1" && -z "${MNEMONIC:-}" ]]; then
+  echo "[deploy] ERROR: MNEMONIC not set. Create sc/.env.local with MNEMONIC=\"word1 ... word12\"" >&2
+  exit 1
+fi
 
 print_accounts() {
   # Parse addresses and privkeys from anvil banner
@@ -74,11 +88,11 @@ cleanup() {
   # Stop tail first
   if [[ -n "${WEB_TAIL_PID:-}" ]]; then kill "${WEB_TAIL_PID}" >/dev/null 2>&1 || true; fi
   # Optionally stop frontend
-  if [[ "${KEEP_WEB}" = "0" && "${WEB_MODE_RUN:-}" == "bg" && -n "${WEB_PID:-}" ]]; then
+  if [[ "${KEEP_WEB:-1}" = "0" && "${WEB_MODE_RUN:-}" == "bg" && -n "${WEB_PID:-}" ]]; then
     kill "${WEB_PID}" >/dev/null 2>&1 || true
   fi
   # Optionally stop anvil
-  if [[ "${KEEP_ANVIL}" = "0" && "${ANVIL_MODE}" == "bg" && -n "${ANVIL_PID:-}" ]]; then
+  if [[ "${KEEP_ANVIL}" = "0" && "${ANVIL_MODE:-}" == "bg" && -n "${ANVIL_PID:-}" ]]; then
     kill "${ANVIL_PID}" >/dev/null 2>&1 || true
   fi
 }
@@ -159,6 +173,15 @@ echo "[deploy] SupplyChain: $ADDR"
 echo "[deploy] Admin:       $ADMIN"
 echo "[deploy] ABI:         web/src/contracts/SupplyChain.abi.json"
 echo "[deploy] Env:         web/.env.local"
+
+# Optionally seed demo data on the local chain
+if [[ "${SEED:-1}" = "1" ]]; then
+  echo "[deploy] Seeding demo data…"
+  (
+    cd "$sc_dir"
+    forge script script/Seed.s.sol --rpc-url "$RPC_URL" --broadcast --sig "run(address)" "$ADDR"
+  )
+fi
 
 # Bring anvil logs or tmux if requested (frontend already started)
 if [[ "$ANVIL_MODE" == "bg" && "$KEEP_ANVIL" = "1" && "$FOREGROUND" == "logs" ]]; then

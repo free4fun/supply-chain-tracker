@@ -17,6 +17,7 @@ via_ir = true
 bytecode_hash = "none"
 cbor_metadata = false
 deny_warnings = true
+ignored_warnings_from = ["script/"]  # Allow warnings in scripts (vm cheatcodes aren't view-compatible)
 
 # Gas report (optional but recommended)
 gas_reports = ["*"]

@@ -5,6 +5,8 @@ import { getTokenInputs, getTokenView, getUserInfo, getUserTransfers, getTransfe
 import { handleBlockOutOfRange } from "@/lib/blockOutOfRange";
 import { useRole } from "@/contexts/RoleContext";
 import { TokenTxHash } from "@/components/TokenTxHash";
+import { useRoleTheme } from "@/hooks/useRoleTheme";
+import { useI18n } from "@/contexts/I18nContext";
 
 type TokenDetailModalProps = {
   tokenId: number | null;
@@ -102,6 +104,8 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
   const [grandInputsByParent, setGrandInputsByParent] = useState<Record<number, Array<{ tokenId: number; amount: bigint; name?: string; creator?: string; creatorCompany?: string; creatorRole?: string; createdAt?: number; acquiredAt?: number; metadata?: Record<string, unknown> }>>>({});
   const [factoryTokens, setFactoryTokens] = useState<Array<{ tokenId: number; name: string; amount: bigint; date: number }>>([]);
   const { activeRole } = useRole();
+  const { theme } = useRoleTheme();
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!tokenId) {
@@ -223,7 +227,7 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
         }
       } catch (err) {
         console.error(err);
-        if (!cancelled) setError("Error al cargar los detalles del token");
+        if (!cancelled) setError(t("tokens.detail.errorLoading"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -279,7 +283,7 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
                     : [];
                   
                   return (
-                    <li key={`${c.tokenId}-${idx}`} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 space-y-3 shadow-sm">
+                    <li key={`${c.tokenId}-${idx}`} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 space-y-3 shadow-sm cursor-default">
                       {/* Header del token */}
                       <div className="flex items-start justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-700">
                         <div className="flex-1">
@@ -287,7 +291,7 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
                             #{c.tokenId} · {c.name ?? `Token ${c.tokenId}`}
                           </p>
                           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                            Cantidad: <span className="font-semibold text-slate-800 dark:text-slate-200">{formatBigInt(c.amount)}</span>
+                            {t("tokens.detail.quantity")} <span className="font-semibold text-slate-800 dark:text-slate-200">{formatBigInt(c.amount)}</span>
                           </p>
                         </div>
                         <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
@@ -332,7 +336,7 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={handleBackdropClick}
     >
-      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-auto rounded-3xl border border-surface bg-white shadow-2xl dark:bg-slate-900 scrollbar-hide">
+      <div className={`relative w-full max-w-3xl max-h-[90vh] overflow-auto rounded-3xl border bg-white shadow-2xl dark:bg-slate-900 scrollbar-hide ${theme.containerBorder}`}>
         <style jsx>{`
           .scrollbar-hide::-webkit-scrollbar {
             display: none;
@@ -342,22 +346,14 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
             scrollbar-width: none;
           }
         `}</style>
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-surface bg-gradient-to-r from-indigo-600 to-sky-500 px-6 py-4 text-white">
-          <div className="flex-1">
-            <h2 className="text-sm font-medium tracking-wide opacity-90 mb-1">
-              {loading ? "Cargando…" : detail ? `Token #${detail.id}` : `Token #${tokenId}`}
-            </h2>
-            {!loading && tokenId && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-white/70">Hash:</span>
-                <TokenTxHash tokenId={tokenId} chainId={31337} variant="light" />
-              </div>
-            )}
-          </div>
+        <div className={`sticky top-0 z-10 flex items-center justify-between border-b bg-gradient-to-r ${theme.gradient} px-6 py-4 text-white ${theme.containerBorder}`}>
+          <h2 className="text-lg font-semibold">
+            {loading ? t("common.loading") : detail ? detail.name || `Token #${detail.id}` : `Token #${tokenId}`}
+          </h2>
           <button
             onClick={onClose}
             className="rounded-full p-2 transition hover:bg-white/20"
-            aria-label="Cerrar"
+            aria-label={t("nav.disconnect")}
           >
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -382,20 +378,25 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
             <>
               {/* Dato principal: nombre y descripción en tarjeta blanca */}
               <section>
-                <div className="rounded-2xl border border-surface bg-white p-5 shadow-sm">
-                  <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">{detail.name || `Token #${detail.id}`}</p>
+                <div className="rounded-2xl border border-surface bg-white p-5 shadow-sm cursor-default space-y-3">
+                  <div>
+                    <p className="text-xl font-semibold text-slate-800 dark:text-slate-200">{detail.name || `Token #${detail.id}`}</p>
+                    <div className="mt-1">
+                      <TokenTxHash tokenId={detail.id} chainId={31337} showFull={true} className="text-sm font-semibold text-slate-800 dark:text-slate-200" />
+                    </div>
+                  </div>
                   {detail.description ? (
-                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{detail.description}</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{detail.description}</p>
                   ) : null}
                 </div>
               </section>
 
               {/* Información básica: solo fecha de creación */}
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Información</h3>
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Información</h3>
                 <div className="grid gap-3">
-                  <div className="rounded-2xl border border-surface bg-surface-2 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Fecha de creación</p>
+                  <div className="rounded-2xl border border-surface bg-surface-2 p-4 cursor-default">
+                    <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t("tokens.detail.creationDate")}</p>
                     <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
                       {detail.createdAt ? formatDate(detail.createdAt) : "—"}
                     </p>
@@ -406,10 +407,10 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
               {/* Metadata predefinida por tipo */}
               {Object.keys(knownMetadata).length > 0 && (
                 <section className="space-y-3">
-                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Características del producto</h3>
+                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Características del producto</h3>
                   <div className="grid gap-3 md:grid-cols-2">
                     {Object.entries(knownMetadata).map(([key, value]) => (
-                      <div key={key} className="rounded-2xl border border-surface bg-surface-2 p-4">
+                      <div key={key} className="rounded-2xl border border-surface bg-surface-2 p-4 cursor-default">
                         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{formatKey(key)}</p>
                         <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">{formatValue(value)}</p>
                       </div>
@@ -421,8 +422,8 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
               {/* Metadata adicional (no predefinida) */}
               {Object.keys(unknownMetadata).length > 0 && (
                 <section className="space-y-3">
-                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Datos adicionales</h3>
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Datos adicionales</h3>
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950 cursor-default">
                     <pre className="text-xs text-slate-700 dark:text-slate-300 overflow-x-auto">
                       {JSON.stringify(unknownMetadata, null, 2)}
                     </pre>
@@ -572,7 +573,7 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
         <div className="sticky bottom-0 border-t border-surface bg-surface-1 px-6 py-4">
           <button
             onClick={onClose}
-            className="w-full rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:brightness-110"
+            className={`w-full rounded-full px-4 py-2 text-sm font-semibold transition ${theme.btnPrimary}`}
           >
             Cerrar
           </button>

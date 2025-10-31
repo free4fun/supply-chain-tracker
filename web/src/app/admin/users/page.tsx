@@ -7,6 +7,7 @@ import { useWeb3 } from "@/contexts/Web3Context";
 import { useToast } from "@/contexts/ToastContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { getErrorMessage } from "@/lib/errors";
+import { useRoleTheme } from "@/hooks/useRoleTheme";
 
 const ADMIN_ENV = (process.env.NEXT_PUBLIC_ADMIN_ADDRESS || "").toLowerCase();
 const STATUS_KEYS = ["Pending", "Approved", "Rejected", "Canceled"] as const;
@@ -17,6 +18,7 @@ export default function AdminUsersPage() {
     const { account, mustConnect, reconnect, switchAcc } = useWeb3();
     const { push } = useToast();
     const { t } = useI18n();
+    const { theme } = useRoleTheme();
     const isAdmin = useMemo(() => (account||"").toLowerCase() === ADMIN_ENV, [account]);
     const [rows, setRows] = useState<Row[]>([]);
     const [onlyPending, setOnlyPending] = useState(true);
@@ -95,7 +97,7 @@ export default function AdminUsersPage() {
         <div className="divide-y border-t border-b border-surface">
             {data.length===0 && <p className="text-sm p-2">{t("admin.users.empty")}</p>}
             {data.map(r => (
-            <div key={r.id} className="p-4 space-y-3 bg-surface-1 rounded-2xl border border-surface">
+            <div key={r.id} className={`p-4 space-y-3 bg-surface-1 rounded-2xl border transition ${theme.cardBorder} ${theme.cardHoverBorder} ${theme.cardHoverShadow}`}>
                 <div className="grid grid-cols-12 gap-3 items-start text-sm">
                     <div className="col-span-4 space-y-1">
                         <div className="font-medium text-slate-500 dark:text-slate-400 text-xs">{t("admin.users.headers.address")}</div>

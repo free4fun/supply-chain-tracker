@@ -532,7 +532,7 @@ export default function Dashboard() {
           <div>
             <p className="text-sm uppercase tracking-[0.35em] opacity-80">{theme.label}</p>
             <h1 className="text-2xl font-semibold">{theme.icon} {t("dashboard.inventory.title")}</h1>
-            <p className="mt-2 max-w-3xl text-sm opacity-90">{t("dashboard.inventory.subtitle")}</p>
+            <p className="mt-2 max-w-4xl text-sm opacity-90">{t("dashboard.inventory.subtitle")}</p>
           </div>
             <button
               type="button"

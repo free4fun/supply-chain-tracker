@@ -24,7 +24,7 @@ export default function TokensSection({
 
   return (
     <>
-    <section id="my-tokens" className={`space-y-4 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-6 shadow-inner`}>
+    <section id="my-tokens" className={`space-y-4 rounded-3xl border bg-white dark:bg-slate-900 p-6 shadow-inner ${theme.containerBorder}`}>
       <h2 className="text-sm text-slate-700 dark:text-slate-300">Mis tokens</h2>
       {tokens.length === 0 && !loading ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">{t("dashboard.inventory.empty")}</p>
@@ -33,16 +33,18 @@ export default function TokensSection({
         <div
           key={id}
           onClick={() => setModalTokenId(id)}
-          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-surface bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3 cursor-pointer"
+          className={`rounded-2xl border bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3 cursor-pointer transition ${theme.cardBorder} ${theme.cardHoverBorder} ${theme.cardHoverShadow}`}
         >
-          <div>
+          <div className="flex items-center justify-between gap-2 mb-2">
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">#{id} · {names[id] ?? `Token ${id}`}</p>
-            <div className="mt-1">
-              <TokenTxHash tokenId={id} chainId={31337} />
+            <div className="flex-shrink-0 flex flex-col items-end">
+              <p className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{t("dashboard.inventory.balanceLabel")}</p>
+              <span className="text-lg font-semibold text-accent dark:text-indigo-300">{balances[id] ?? "…"}</span>
             </div>
-            <p className="text-xs mt-1 text-slate-500 dark:text-slate-400">{t("dashboard.inventory.balanceLabel")}</p>
           </div>
-          <span className="text-lg font-semibold text-accent dark:text-indigo-300">{balances[id] ?? "…"}</span>
+          <div className="mt-1">
+            <TokenTxHash tokenId={id} chainId={31337} showFull={true} className="text-xs" />
+          </div>
         </div>
       ))}
     </section>

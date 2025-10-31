@@ -20,7 +20,7 @@ export default function TimelineSection({
   const total = counts.length ? counts.reduce((a, b) => a + b, 0) : 0;
   const { theme } = useRoleTheme();
   return (
-    <section className={`space-y-3 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-5 shadow-inner`}>
+    <section className={`space-y-3 rounded-3xl border bg-white dark:bg-slate-900 p-5 shadow-inner ${theme.containerBorder}`}>
       <div className="flex items-center justify-between">
         <h2 className="text-sm text-slate-700 dark:text-slate-300">{t("dashboard.activity.timeline")}</h2>
         <div className="flex items-center gap-2">

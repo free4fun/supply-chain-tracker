@@ -393,12 +393,33 @@ export default function TransfersPage() {
   }
 
   return (
-    <div className="space-y-8">
-  <section className={`space-y-4 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-6 shadow-inner`}>
+    <div className={`space-y-8 rounded-[28px] border ${theme.containerBorder} ${theme.background} p-6 shadow-xl shadow-black/5`}>
+      <header className={`rounded-3xl bg-gradient-to-r ${theme.gradient} px-6 py-5 text-white shadow-lg`}>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.35em] opacity-80">{theme.label}</p>
+            <h1 className="text-2xl font-semibold">{theme.icon} {t("nav.transfers")}</h1>
+            <p className="mt-1 max-w-4xl text-sm opacity-90">{theme.intro}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              refreshTransfers();
+              refreshTokens({ silent: true });
+              refreshRecipients({ silent: true });
+            }}
+            disabled={loadingTransfers}
+            className="rounded-full border border-white/60 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-60"
+          >
+            {loadingTransfers ? t("transfers.refreshing") : t("transfers.refresh")}
+          </button>
+        </div>
+      </header>
+  <section className={`space-y-4 rounded-3xl border bg-white dark:bg-slate-900 p-6 shadow-inner ${theme.containerBorder}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">{t("transfers.title")}</h1>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t("transfers.title")}</h2>
           {nextRole ? (
-            <span className="rounded-full border border-indigo-300/60 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-600 dark:border-indigo-500/40 dark:text-indigo-300">
+            <span className="rounded-full border px-3 py-1 text-xs font-semibold border-accent text-accent">
               {t("transfers.allowedRecipients", { role: nextRole })}
             </span>
           ) : (
@@ -411,7 +432,7 @@ export default function TransfersPage() {
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
               {t("transfers.form.token")}
               <select
-                className="mt-1 w-full rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:text-slate-200"
+                className={`mt-1 w-full rounded-xl border bg-surface-2 px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-200 shadow-sm transition ${theme.inputBorder} hover:border-accent ${theme.inputFocusBorder} focus-visible:outline-none`}
                 value={selectedToken}
                 onChange={event => setSelectedToken(event.target.value)}
               >
@@ -429,7 +450,7 @@ export default function TransfersPage() {
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
               {t("transfers.form.amount")}
               <input
-                className="mt-1 w-full rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm text-slate-800 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:text-slate-200"
+                className={`mt-1 w-full rounded-xl border bg-surface-2 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 shadow-sm transition ${theme.inputBorder} hover:border-accent ${theme.inputFocusBorder} focus-visible:outline-none`}
                 value={amount}
                 onChange={event => setAmount(event.target.value)}
                 placeholder={t("transfers.form.amountPlaceholder")}
@@ -441,7 +462,7 @@ export default function TransfersPage() {
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300 md:col-span-2">
               {t("transfers.form.recipient")}
               <select
-                className="mt-1 w-full rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:text-slate-200"
+                className={`mt-1 w-full rounded-xl border bg-surface-2 px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-200 shadow-sm transition ${theme.inputBorder} hover:border-accent ${theme.inputFocusBorder} focus-visible:outline-none`}
                 value={selectedRecipient}
                 onChange={event => setSelectedRecipient(event.target.value)}
               >
@@ -463,7 +484,7 @@ export default function TransfersPage() {
 
             {selectedRecipient === "__custom" ? (
               <input
-                className="md:col-span-2 rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm text-slate-800 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:text-slate-200"
+                className={`md:col-span-2 rounded-xl border bg-surface-2 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 shadow-sm transition ${theme.inputBorder} hover:border-accent ${theme.inputFocusBorder} focus-visible:outline-none`}
                 value={customRecipient}
                 onChange={event => setCustomRecipient(event.target.value)}
                 placeholder="0x..."
@@ -473,7 +494,7 @@ export default function TransfersPage() {
             <div className="md:col-span-2 flex justify-end">
               <button
                 disabled={disabled}
-                className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:brightness-110 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                className={`rounded-full px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:brightness-110 disabled:opacity-60 bg-gradient-to-r ${theme.gradient}`}
               >
                 {pending ? t("transfers.form.creating") : t("transfers.form.submit")}
               </button>
@@ -484,16 +505,10 @@ export default function TransfersPage() {
         )}
       </section>
 
-  <section className={`space-y-3 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-6 shadow-inner`}>
+  <section className={`space-y-3 rounded-3xl border bg-white dark:bg-slate-900 p-6 shadow-inner ${theme.containerBorder}`}>
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("transfers.incoming.title")}</h2>
-          <button
-            onClick={() => refreshTransfers()}
-            disabled={loadingTransfers}
-            className="rounded-full border border-surface px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-accent hover:text-accent disabled:opacity-60 dark:text-slate-200"
-          >
-            {loadingTransfers ? t("transfers.refreshing") : t("transfers.refresh")}
-          </button>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t("transfers.incoming.title")}</h2>
+          
         </div>
         <div className="grid gap-3">
           {incoming.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">{t("transfers.incoming.empty")}</p> : null}
@@ -501,14 +516,14 @@ export default function TransfersPage() {
             <div
               key={row.id}
               onClick={() => setModalTokenId(row.tokenId)}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-surface bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3 cursor-pointer"
+              className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3 cursor-pointer transition ${theme.cardBorder} ${theme.cardHoverBorder} ${theme.cardHoverShadow}`}
             >
               <div className="space-y-1">
                 <p className="text-left text-sm font-semibold text-slate-800 dark:text-slate-100">
                   #{row.tokenId} · {row.tokenName ?? `Token ${row.tokenId}`} · {row.amount}
                 </p>
                 <div className="mt-1">
-                  <TokenTxHash tokenId={row.tokenId} chainId={31337} />
+                  <TokenTxHash tokenId={row.tokenId} chainId={31337} showFull={true} />
                 </div>
                 <p className="text-xs mt-1 text-slate-500 dark:text-slate-400">{t("transfers.incoming.from", { address: `${row.fromDisplay ?? row.from}` })}</p>
                 <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
@@ -562,21 +577,21 @@ export default function TransfersPage() {
         </div>
       </section>
 
-  <section className={`space-y-3 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-6 shadow-inner`}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("transfers.outgoing.title")}</h2>
+  <section className={`space-y-3 rounded-3xl border bg-white dark:bg-slate-900 p-6 shadow-inner ${theme.containerBorder}`}>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t("transfers.outgoing.title")}</h2>
         <div className="grid gap-3">
           {outgoing.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">{t("transfers.outgoing.empty")}</p> : null}
           {outgoing.map(row => (
             <div
               key={row.id}
               onClick={() => setModalTokenId(row.tokenId)}
-              className="rounded-2xl border border-surface bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3 cursor-pointer"
+              className={`rounded-2xl border bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3 cursor-pointer transition ${theme.cardBorder} ${theme.cardHoverBorder} ${theme.cardHoverShadow}`}
             >
               <p className="text-left text-sm font-semibold text-slate-800 dark:text-slate-100">
                 #{row.tokenId} · {row.tokenName ?? `Token ${row.tokenId}`} · {row.amount}
               </p>
               <div className="mt-1">
-                <TokenTxHash tokenId={row.tokenId} chainId={31337} />
+                <TokenTxHash tokenId={row.tokenId} chainId={31337} showFull={true} />
               </div>
               <p className="text-xs mt-1 text-slate-500 dark:text-slate-400">{t("transfers.outgoing.to", { address: `${row.toDisplay ?? row.to}` })}</p>
               <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${

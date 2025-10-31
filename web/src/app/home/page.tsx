@@ -112,7 +112,7 @@ function RoleWorkflowSection({
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
           {t("landing.workflow.selectLabel")}
           <select
-            className="rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:text-slate-200"
+            className="rounded-xl border border-surface bg-surface-2 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-accent focus:border-accent-2 focus-visible:outline-none dark:text-slate-200"
             value={selectedRole}
             onChange={event => setSelectedRole(event.target.value as RoleKey)}
           >
@@ -148,7 +148,7 @@ function RoleWorkflowSection({
           {guide.stepKeys.map((stepKey, index) => (
             <li
               key={stepKey}
-              className="rounded-2xl border border-surface bg-surface-2 px-4 py-3 font-medium shadow-sm hover:bg-surface-3"
+              className="rounded-2xl border border-surface bg-surface-2 px-4 py-3 font-medium shadow-sm hover:bg-surface-3 cursor-default"
             >
               <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500/10 text-xs font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200">
                 {index + 1}
@@ -358,7 +358,7 @@ export default function Page() {
           ].map(feature => (
             <article
               key={feature.titleKey}
-              className="group rounded-3xl border border-surface bg-surface-2 p-6 transition hover:-translate-y-1 hover:bg-surface-3 hover:border-accent hover:shadow-xl"
+              className="group rounded-3xl border border-surface bg-surface-2 p-6 transition hover:-translate-y-1 hover:bg-surface-3 hover:border-accent hover:shadow-xl cursor-default"
             >
               <h3 className="text-lg font-semibold text-slate-900 transition group-hover:text-indigo-600 dark:text-white dark:group-hover:text-indigo-300">
                 {t(feature.titleKey)}

@@ -33,7 +33,7 @@ export default function QuickLinks({
     t: (key: string) => string;
 }) {
     return (
-        <section className={`space-y-3 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-6 shadow-inner`}>
+        <section className={`space-y-3 rounded-3xl border bg-white dark:bg-slate-900 p-6 shadow-inner ${theme.containerBorder}`}>
             <h2 className="text-sm text-slate-700 dark:text-slate-300">{t("dashboard.activity.timeline")}</h2>
             <div className="flex flex-wrap items-center gap-2">
                
