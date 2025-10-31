@@ -1,75 +1,283 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useBlockWatcher } from "@/hooks/useBlockWatcher";
-import { getTokenBalance, getTokenView, getSuggestedParent, nextTokenId } from "@/lib/sc";
+import {
+  getTokenBalance,
+  getTokenInputs,
+  getTokenView,
+  getUserTokens,
+  type TokenComponent,
+} from "@/lib/sc";
 import { useRole } from "@/contexts/RoleContext";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { useI18n } from "@/contexts/I18nContext";
+import { useRoleTheme } from "@/hooks/useRoleTheme";
+import { resetProvider } from "@/lib/web3";
+import TokenDetailModal from "@/components/TokenDetailModal";
+import { TokenTxHash } from "@/components/TokenTxHash";
+// Helper: detect BlockOutOfRange and force full session cleanup
+function handleBlockOutOfRange(err: unknown) {
+  const msg = (typeof err === "string" ? err : (err as any)?.message || "") as string;
+  if (/BlockOutOfRange|block height|eth_call/i.test(msg)) {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+    } catch {}
+    try { resetProvider(); } catch {}
+    window.location.reload();
+    return true;
+  }
+  return false;
+}
 
-type TokenRow = {
+type TokenDetail = {
   id: number;
   name: string;
   description: string;
-  supply: number;
-  parentId: number;
   creator: string;
-  features: string;
+  totalSupply: bigint;
+  availableSupply: bigint;
+  parentId: number;
   createdAt: number;
+  balance: bigint;
+  metadata: Record<string, unknown> | null;
+  features: string;
+  inputs: TokenComponent[];
 };
 
-type TraceNode = { id: number; name: string; description: string };
+type TraceNode = {
+  detail: TokenDetail;
+  amount?: bigint;
+  children: TraceNode[];
+};
 
-const TRANSFER_ROLES = new Set(["Producer", "Factory", "Retailer"]);
+function parseMetadata(raw: string): Record<string, unknown> | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function formatKey(key: string): string {
+  return key
+    .replace(/_/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^\w/, c => c.toUpperCase());
+}
+
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "object") return JSON.stringify(value, null, 2);
+  return String(value);
+}
+
+function formatBigInt(value: bigint): string {
+  return value.toLocaleString("es-AR");
+}
+
+function MetadataPanel({ metadata }: { metadata: Record<string, unknown> | null }) {
+  const { t } = useI18n();
+  if (!metadata || Object.keys(metadata).length === 0) {
+    return <p className="text-sm text-slate-500">{t("common.noMetadata")}</p>;
+  }
+  return (
+    <dl className="grid gap-3 md:grid-cols-2">
+      {Object.entries(metadata).map(([key, value]) => (
+        <div key={key} className="rounded-2xl border border-surface bg-surface-2 p-3 shadow-sm">
+          <dt className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{formatKey(key)}</dt>
+          <dd className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{formatValue(value)}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function TraceTree({ node, depth = 0, onTokenClick }: { node: TraceNode; depth?: number; onTokenClick: (id: number) => void }) {
+  const { theme } = useRoleTheme();
+  const { t } = useI18n();
+  
+  return (
+    <li className="relative pl-6">
+      {depth > 0 ? (
+        <span className="absolute left-0 top-3 h-full border-l-2 border-surface" aria-hidden />
+      ) : null}
+      <div
+        onClick={() => onTokenClick(node.detail.id)}
+        className={`group w-full text-left rounded-2xl border px-4 py-4 shadow-sm transition cursor-pointer bg-surface-2 hover:bg-surface-3 ${theme.cardBorder} ${theme.cardHoverBorder} ${theme.cardHoverShadow} space-y-3`}
+      >
+        <div className="space-y-2">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">#{node.detail.id} · {node.detail.name}</p>
+            {node.detail.description ? (
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">{node.detail.description}</p>
+            ) : null}
+          </div>
+          <div>
+            <TokenTxHash tokenId={node.detail.id} chainId={31337} showFull={true} className="text-xs text-slate-700 dark:text-slate-300" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div className="rounded-xl border border-slate-200/60 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{t("tokens.detail.availableGlobal")}</p>
+            <p className="text-sm font-medium text-slate-700 mt-1">{formatBigInt(node.detail.availableSupply)}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200/60 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{t("tokens.detail.creationDate")}</p>
+            <p className="text-sm font-medium text-slate-700 mt-1">{node.detail.createdAt ? new Date(node.detail.createdAt * 1000).toLocaleString("es-AR", { timeZone: "UTC" }) : "-"}</p>
+          </div>
+        </div>
+        {typeof node.amount !== "undefined" ? (
+          <p className="rounded-xl border border-slate-200/60 px-3 py-2 text-xs font-medium text-slate-600">
+            {t("tokens.detail.usedAmount", { amount: formatBigInt(node.amount) })}
+          </p>
+        ) : null}
+        {node.detail.metadata ? (
+          <div className="text-xs text-slate-600">
+            <p className="font-semibold mb-2">{t("tokens.detail.mainData")}</p>
+            <div className="grid gap-2 md:grid-cols-2">
+              {Object.entries(node.detail.metadata)
+                .slice(0, 4)
+                .map(([key, value]) => (
+                  <div key={key} className="rounded-xl border border-slate-200/60 px-3 py-2">
+                    <span className="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{formatKey(key)}</span>
+                    <span className="text-xs text-slate-700 mt-1 block">{formatValue(value)}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+      {node.children.length ? (
+        <ul className="mt-3 space-y-3">
+          {node.children.map((child, idx) => (
+            <TraceTree key={`${node.detail.id}-${child.detail.id}-${idx}`} node={child} depth={depth + 1} onTokenClick={onTokenClick} />
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  );
+}
 
 export default function TokensPage() {
-  const [rows, setRows] = useState<TokenRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [trace, setTrace] = useState<TraceNode[]>([]);
-  const [balance, setBalance] = useState<string>("0");
-  const [balanceLoading, setBalanceLoading] = useState(false);
-  const [suggestedParent, setSuggestedParent] = useState<bigint>(0n);
-
   const { t } = useI18n();
-  const { account } = useWeb3();
-  const { activeRole, isApproved } = useRole();
+  const { account, mustConnect } = useWeb3();
+  const { isApproved, loading: roleLoading, statusLabel } = useRole();
 
-  const refresh = useCallback(async ({ silent }: { silent?: boolean } = {}) => {
-    if (!silent) setLoading(true);
-    try {
-      const nextId = await nextTokenId();
-      const acc: TokenRow[] = [];
-      for (let i = 1; i < nextId; i++) {
+  const [tokens, setTokens] = useState<TokenDetail[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [trace, setTrace] = useState<TraceNode | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [modalTokenId, setModalTokenId] = useState<number | null>(null);
+
+  const cacheRef = useRef(new Map<number, TokenDetail>());
+
+  const { theme } = useRoleTheme();
+
+  const fetchDetail = useCallback(
+    async (id: number, options: { includeBalance?: boolean } = {}): Promise<TokenDetail> => {
+      const cached = cacheRef.current.get(id);
+      // Solo usar caché si tenemos balance Y inputs
+      if (cached && cached.inputs && (!options.includeBalance || typeof cached.balance === "bigint")) {
+        return cached;
+      }
+      let view, components;
+      try {
+        view = await getTokenView(id);
+      } catch (err) { handleBlockOutOfRange(err); throw err; }
+      try {
+        components = await getTokenInputs(id);
+      } catch (err) { handleBlockOutOfRange(err); throw err; }
+      const features = String(view[5]);
+      let balance = cached?.balance ?? 0n;
+      if (options.includeBalance && account) {
         try {
-          const token = await getTokenView(i);
-          acc.push({
-            id: Number(token[0]),
-            creator: token[1],
-            name: token[2],
-            description: token[3],
-            supply: Number(token[4]),
-            features: token[5],
-            parentId: Number(token[6]),
-            createdAt: Number(token[7]),
-          });
+          const raw = await getTokenBalance(id, account);
+          balance = BigInt(raw);
         } catch (err) {
-          console.error(err);
+          handleBlockOutOfRange(err) || console.error(err);
         }
       }
-      setRows(acc);
-      if (acc.length > 0) {
-        const firstId = acc[0].id;
-        setSelectedId(current => (current && acc.some(token => token.id === current) ? current : firstId));
-      } else {
+      const detail: TokenDetail = {
+        id: Number(view[0]),
+        creator: String(view[1]),
+        name: String(view[2]),
+        description: String(view[3] ?? ""),
+        totalSupply: BigInt(view[4]),
+        features,
+        parentId: Number(view[6]),
+        createdAt: Number(view[7]),
+        availableSupply: BigInt(view[8] ?? 0n),
+        balance,
+        metadata: parseMetadata(features),
+        inputs: components,
+      };
+      cacheRef.current.set(id, detail);
+      return detail;
+    },
+    [account]
+  );
+
+  const buildTrace = useCallback(
+    async (rootId: number): Promise<TraceNode> => {
+      const walk = async (id: number, amount?: bigint, depth: number = 0): Promise<TraceNode> => {
+        const detail = await fetchDetail(id);
+        // Limitar profundidad para evitar ciclos infinitos
+        if (depth > 20) {
+          return { detail, amount, children: [] };
+        }
+        const children: TraceNode[] = [];
+        for (const input of detail.inputs) {
+          children.push(await walk(input.tokenId, input.amount, depth + 1));
+        }
+        return { detail, amount, children };
+      };
+      return walk(rootId);
+    },
+    [fetchDetail]
+  );
+
+  const refresh = useCallback(
+    async ({ silent }: { silent?: boolean } = {}) => {
+      if (!account || mustConnect) {
+        setTokens([]);
         setSelectedId(null);
+        setTrace(null);
+        return;
       }
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, []);
+      if (!silent) setLoading(true);
+      try {
+        const ids = await getUserTokens(account);
+        const owned: TokenDetail[] = [];
+        for (const rawId of ids) {
+          const id = Number(rawId);
+          try {
+            const detail = await fetchDetail(id, { includeBalance: true });
+            cacheRef.current.set(id, detail);
+            if (detail.balance > 0n) owned.push(detail);
+          } catch (err) {
+            handleBlockOutOfRange(err) || console.error(err);
+          }
+        }
+        owned.sort((a, b) => b.createdAt - a.createdAt || b.id - a.id);
+        setTokens(owned);
+        if (owned.length > 0) {
+          setSelectedId(prev => (prev && owned.some(token => token.id === prev) ? prev : owned[0].id));
+        } else {
+          setSelectedId(null);
+          setTrace(null);
+        }
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [account, mustConnect, fetchDetail]
+  );
 
   useEffect(() => {
     void refresh();
@@ -78,247 +286,166 @@ export default function TokensPage() {
   useBlockWatcher(() => refresh({ silent: true }), [refresh]);
 
   useEffect(() => {
-    if (!account) {
-      setSuggestedParent(0n);
+    if (!selectedId) {
+      setTrace(null);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const raw = await getSuggestedParent(account);
-        if (!cancelled) setSuggestedParent(BigInt(raw));
+        const tree = await buildTrace(selectedId);
+        if (!cancelled) setTrace(tree);
       } catch (err) {
         console.error(err);
-        if (!cancelled) setSuggestedParent(0n);
+        if (!cancelled) setTrace(null);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [account, activeRole]);
+  }, [selectedId, buildTrace]);
 
-  const tokensById = useMemo(() => Object.fromEntries(rows.map(row => [row.id, row])), [rows]);
+  if (mustConnect) {
+    return (
+      <div className="rounded-3xl border border-surface bg-surface-1 p-6 text-sm text-slate-600 shadow-inner">
+        {t("transfers.connectPrompt")}
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    if (!selectedId) {
-      setTrace([]);
-      return;
-    }
-    const path: TraceNode[] = [];
-    let cursor: number | undefined | null = selectedId;
-    const safety = new Set<number>();
-    while (cursor && cursor > 0 && !safety.has(cursor)) {
-      safety.add(cursor);
-      const node = tokensById[cursor];
-      if (!node) break;
-      path.push({ id: node.id, name: node.name, description: node.description });
-      cursor = node.parentId;
-    }
-    if (cursor === 0) {
-      path.push({ id: 0, name: t("tokens.trace.root"), description: "" });
-    }
-    setTrace(path);
-  }, [selectedId, tokensById, t]);
-
-  useEffect(() => {
-    if (!account || !selectedId) {
-      setBalance("0");
-      return;
-    }
-    let cancelled = false;
-    setBalanceLoading(true);
-    getTokenBalance(selectedId, account)
-      .then(value => {
-        if (!cancelled) setBalance(value.toString());
-      })
-      .catch(err => {
-        console.error(err);
-        if (!cancelled) setBalance("0");
-      })
-      .finally(() => {
-        if (!cancelled) setBalanceLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [account, selectedId]);
-
-  const selectedToken = selectedId ? tokensById[selectedId] : undefined;
-
-  const canTransfer = Boolean(
-    account &&
-      isApproved &&
-      selectedToken &&
-      activeRole &&
-      TRANSFER_ROLES.has(activeRole) &&
-      BigInt(balance || "0") > 0n
-  );
-
-  const canCreate = Boolean(
-    selectedToken &&
-      isApproved &&
-      activeRole &&
-      (activeRole === "Producer" || activeRole === "Factory")
-  );
-
-  const deriveAllowed = Boolean(
-    canCreate &&
-      activeRole === "Factory" &&
-      selectedToken &&
-      suggestedParent === BigInt(selectedToken.id)
-  );
-
-  const metadataPreview = useMemo(() => {
-    if (!selectedToken?.features) return null;
-    try {
-      return JSON.stringify(JSON.parse(selectedToken.features), null, 2);
-    } catch {
-      return selectedToken.features;
-    }
-  }, [selectedToken]);
+  if (!roleLoading && !isApproved) {
+    return (
+      <div className="rounded-3xl border border-amber-300/60 bg-amber-50/80 p-6 text-sm text-amber-900 shadow-sm">
+        <p className="font-semibold">{t("tokens.create.notApprovedTitle")}</p>
+        <p>{t("tokens.create.notApprovedBody", { status: statusLabel ?? t("common.status.none") })}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-white">{t("tokens.title")}</h1>
-        <button
-          onClick={() => refresh()}
-          disabled={loading}
-          className="rounded-full border border-slate-300/70 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200"
-        >
-          {loading ? t("tokens.refreshing") : t("tokens.refresh")}
-        </button>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-        <section className="space-y-3 rounded-3xl border border-slate-200/70 bg-white/90 p-4 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
-          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("tokens.list.title")}</h2>
-          <div className="grid gap-2">
-            {rows.length === 0 && !loading ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">{t("tokens.list.empty")}</p>
-            ) : null}
-            {rows.map(row => {
-              const isActive = row.id === selectedId;
-              return (
-                <button
-                  key={row.id}
-                  type="button"
-                  onClick={() => setSelectedId(row.id)}
-                  className={`flex flex-col items-start gap-1 rounded-2xl border px-4 py-3 text-left transition ${
-                    isActive
-                      ? "border-indigo-400 bg-indigo-500/10 text-indigo-700 dark:border-indigo-500/60 dark:bg-indigo-500/10 dark:text-indigo-200"
-                      : "border-slate-200/70 bg-white/80 text-slate-700 hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300"
-                  }`}
-                >
-                  <span className="text-sm font-semibold">#{row.id} · {row.name}</span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">{t("tokens.list.parent", { parent: row.parentId })}</span>
-                </button>
-              );
-            })}
+    <div className={`space-y-6 rounded-[28px] border ${theme.accentBorder} ${theme.background} p-6 shadow-xl shadow-black/5`}>
+      <header className={`rounded-3xl bg-gradient-to-r ${theme.gradient} px-6 py-5 text-white shadow-lg`}>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.35em] opacity-80">{theme.label}</p>
+            <h1 className="text-2xl font-semibold">{theme.icon} {t("tokens.pageTitle")}</h1>
+            <p className="mt-2 max-w-4xl text-sm opacity-90">{theme.intro}</p>
           </div>
-        </section>
+          <button
+            type="button"
+            onClick={() => refresh()}
+            disabled={loading}
+            className="rounded-full border border-white/60 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-60"
+          >
+            {loading ? t("tokens.refreshing") : t("tokens.refresh")}
+          </button>
+        </div>
+      </header>
 
-        <section className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
-          {selectedToken ? (
-            <>
-              <header className="space-y-2">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{selectedToken.name}</h2>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  {selectedToken.description || t("tokens.detail.noDescription")}
-                </p>
-                <dl className="grid grid-cols-2 gap-3 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-4">
-                  <div>
-                    <dt className="font-semibold uppercase tracking-wide">{t("tokens.detail.id")}</dt>
-                    <dd>#{selectedToken.id}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-semibold uppercase tracking-wide">{t("tokens.detail.parent")}</dt>
-                    <dd>{selectedToken.parentId}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-semibold uppercase tracking-wide">{t("tokens.detail.supply")}</dt>
-                    <dd>{selectedToken.supply}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-semibold uppercase tracking-wide">{t("tokens.detail.creator")}</dt>
-                    <dd className="break-all">{selectedToken.creator}</dd>
-                  </div>
-                </dl>
-              </header>
-
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("tokens.actions.title")}</h3>
-                <div className="flex flex-wrap gap-2">
-                  <Link
-                    href="/transfers"
-                    className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-                      canTransfer
-                        ? "bg-gradient-to-r from-indigo-600 to-sky-500 text-white shadow-md shadow-indigo-500/30"
-                        : "pointer-events-none border border-slate-200/70 text-slate-400 dark:border-slate-700 dark:text-slate-500"
-                    }`}
-                    aria-disabled={!canTransfer}
-                  >
-                    {t("tokens.actions.transfer")}
-                  </Link>
-                  <Link
-                    href="/tokens/create"
-                    className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-                      canCreate && (activeRole === "Producer" || deriveAllowed)
-                        ? "bg-gradient-to-r from-sky-500 to-emerald-500 text-white shadow-md shadow-emerald-500/30"
-                        : "pointer-events-none border border-slate-200/70 text-slate-400 dark:border-slate-700 dark:text-slate-500"
-                    }`}
-                    aria-disabled={!(canCreate && (activeRole === "Producer" || deriveAllowed))}
-                  >
-                    {activeRole === "Producer"
-                      ? t("tokens.actions.createRoot")
-                      : t("tokens.actions.createDerived")}
-                  </Link>
-                </div>
-                {!canTransfer && account && BigInt(balance || "0") === 0n ? (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{t("tokens.actions.transferHint")}</p>
-                ) : null}
-                {canCreate && activeRole === "Factory" && !deriveAllowed ? (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{t("tokens.actions.derivedHint")}</p>
-                ) : null}
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("tokens.detail.balance")}</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  {balanceLoading ? t("tokens.detail.balanceLoading") : t("tokens.detail.balanceValue", { value: balance })}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("tokens.detail.trace")}</h3>
-                <ol className="grid gap-2 text-sm">
-                  {trace.map(node => (
-                    <li key={`${node.id}-${node.name}`} className="rounded-2xl border border-slate-200/70 bg-white/80 px-4 py-2 dark:border-slate-700 dark:bg-slate-900/70">
-                      <span className="font-semibold text-slate-800 dark:text-slate-100">
-                        {node.id === 0 ? t("tokens.trace.rootLabel") : `#${node.id} · ${node.name}`}
-                      </span>
-                      {node.description ? (
-                        <p className="text-xs text-slate-500 dark:text-slate-400">{node.description}</p>
-                      ) : null}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-
-              {metadataPreview ? (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("tokens.detail.metadata")}</h3>
-                  <pre className="overflow-x-auto rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
-                    {metadataPreview}
-                  </pre>
-                </div>
-              ) : null}
-            </>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className={`space-y-4 rounded-3xl border bg-surface-1 p-5 shadow-inner ${theme.containerBorder}`}>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t("tokens.myTokens")}</h2>
+          {tokens.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-surface bg-surface-2 p-4 text-sm text-slate-500">{theme.empty}</p>
           ) : (
-            <p className="text-sm text-slate-500 dark:text-slate-400">{t("tokens.detail.empty")}</p>
+            <div className="grid gap-3">
+              {tokens.map(token => {
+                const isActive = selectedId === token.id;
+                return (
+                  <div key={token.id} className="relative">
+                    <div
+                      onClick={() => setSelectedId(token.id)}
+                      className={`w-full rounded-2xl px-4 py-3 text-left shadow-sm transition cursor-pointer ${
+                        isActive
+                          ? `bg-gradient-to-r ${theme.gradient} text-white shadow-md`
+                          : `border bg-surface-2 hover:bg-surface-3 text-slate-700 dark:text-slate-200 ${theme.cardBorder} ${theme.cardHoverBorder} ${theme.cardHoverShadow}`
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <p className="text-sm font-semibold">#{token.id} · {token.name}</p>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold whitespace-nowrap">{t("tokens.detail.balance")}: {formatBigInt(token.balance)}</p>
+                          <p className={`text-xs whitespace-nowrap ${isActive ? "text-white/80" : "text-slate-500"}`}>
+                            {t("tokens.detail.availableGlobal")}: {formatBigInt(token.availableSupply)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mb-2">
+                        <TokenTxHash 
+                          tokenId={token.id} 
+                          chainId={31337} 
+                          showFull={true} 
+                          className={`text-xs font-semibold ${isActive ? 'text-white/90' : 'text-slate-800 dark:text-slate-100'}`} 
+                        />
+                      </div>
+                      <p className={`text-xs ${isActive ? "text-white/80" : "text-slate-500"}`}>
+                        {token.description || t("tokens.detail.noDescriptionShort")}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
-        </section>
+        </div>
+
+        <div className={`space-y-5 rounded-3xl border bg-surface-1 p-6 shadow-inner ${theme.containerBorder}`}>
+          {selectedId && trace ? (
+            <div className="space-y-5">
+              <div className="space-y-3">
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200">#{trace.detail.id} · {trace.detail.name}</h2>
+                  <div className="mt-1">
+                    <TokenTxHash tokenId={trace.detail.id} chainId={31337} showFull={true} className="text-sm font-semibold text-slate-800 dark:text-slate-100" />
+                  </div>
+                </div>
+                {trace.detail.description && (
+                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{trace.detail.description}</p>
+                )}
+                <div className="grid grid-cols-3 gap-3 pt-2">
+                  <div className="rounded-xl bg-surface-2 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t("tokens.detail.currentBalance")}</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{formatBigInt(trace.detail.balance)}</p>
+                  </div>
+                  <div className="rounded-xl bg-surface-2 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t("tokens.detail.available")}</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{formatBigInt(trace.detail.availableSupply)}</p>
+                  </div>
+                  <div className="rounded-xl bg-surface-2 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t("tokens.detail.created")}</p>
+                    <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                      {trace.detail.createdAt ? new Date(trace.detail.createdAt * 1000).toLocaleDateString("es-AR", { timeZone: "UTC" }) : "-"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{t("tokens.detail.characteristics")}</h3>
+                <MetadataPanel metadata={trace.detail.metadata} />
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{t("tokens.detail.traceability")}</h3>
+                <p className="text-xs text-slate-500">
+                  {t("tokens.detail.traceabilityDescription")}
+                </p>
+                <ul className="mt-3 space-y-3">
+                  <TraceTree node={trace} onTokenClick={(id) => setModalTokenId(id)} />
+                </ul>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">{t("tokens.detail.selectToken")}</p>
+          )}
+        </div>
       </div>
+
+      <TokenDetailModal
+        tokenId={modalTokenId}
+        onClose={() => setModalTokenId(null)}
+        fetchDetail={fetchDetail}
+      />
     </div>
   );
 }

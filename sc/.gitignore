@@ -1,6 +1,23 @@
+# Foundry build artifacts
 out/
 cache/
 lib/
 broadcast/
 foundry-cache/
+
+# Environment variables and sensitive data
 .env
+.env.local
+.env.*.local
+*.env
+*.env.local
+
+# Private keys and secrets
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+
+# Logs
+*.log

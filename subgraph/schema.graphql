@@ -1,0 +1,64 @@
+type Token @entity(immutable: false) {
+  id: ID! # tokenId as string
+  tokenId: BigInt!
+  creator: Bytes!
+  name: String!
+  description: String!
+  totalSupply: BigInt!
+  availableSupply: BigInt!
+  features: String!
+  parentId: BigInt!
+  dateCreated: BigInt!
+  
+  # Transaction info
+  txHash: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  
+  # Relations
+  inputs: [TokenInput!]! @derivedFrom(field: "token")
+  transfers: [Transfer!]! @derivedFrom(field: "token")
+  
+  # User info (populated separately if needed)
+  creatorCompany: String
+  creatorRole: String
+}
+
+type TokenInput @entity(immutable: true) {
+  id: ID! # tokenId-inputTokenId
+  token: Token!
+  inputTokenId: BigInt!
+  amount: BigInt!
+}
+
+type Transfer @entity(immutable: false) {
+  id: ID! # transferId as string
+  transferId: BigInt!
+  from: Bytes!
+  to: Bytes!
+  token: Token!
+  tokenId: BigInt!
+  amount: BigInt!
+  dateCreated: BigInt!
+  status: Int! # 0=Pending, 1=Accepted, 2=Rejected, 3=Cancelled
+  
+  # Transaction info
+  txHash: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+}
+
+type User @entity(immutable: false) {
+  id: ID! # address
+  address: Bytes!
+  role: String!
+  company: String!
+  contact: String!
+  firstName: String!
+  lastName: String!
+  
+  # Stats (counts only, since @derivedFrom doesn't work with Bytes fields)
+  tokensCreatedCount: BigInt!
+  transfersFromCount: BigInt!
+  transfersToCount: BigInt!
+}

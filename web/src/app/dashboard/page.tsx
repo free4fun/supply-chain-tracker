@@ -1,88 +1,72 @@
 // web/src/app/dashboard/page.tsx
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useWeb3 } from "@/contexts/Web3Context";
 import { useRole } from "@/contexts/RoleContext";
 import { useBlockWatcher } from "@/hooks/useBlockWatcher";
-import { getUserTokens, getTokenBalance } from "@/lib/sc";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { getUserTokens, getTokenBalance, getUserTransfers, getTransfer, getTokenView, acceptTransfer, rejectTransfer, getUserCreatedSummary, getUserBalancesNonZero, getUserCreatedTokens } from "@/lib/sc";
+import { resetProvider } from "@/lib/web3";
+import RecentTransfers, { type RecentItem } from "@/components/RecentTransfers";
+import StatsSection from "@/components/dashboard/StatsSection";
+import TimelineSection from "@/components/dashboard/TimelineSection";
+import PendingTransfersSection from "@/components/dashboard/PendingTransfersSection";
+import TokensSection from "@/components/dashboard/TokensSection";
 import { useI18n } from "@/contexts/I18nContext";
-
-// Translation-driven panel configuration keeps copy in sync across languages.
-type PanelConfig = {
-  titleKey: string;
-  nextRoleKey?: string;
-  tipKeys: readonly string[];
-  actions: readonly { href: string; labelKey: string }[];
-};
-
-const ROLE_PANELS: Record<string, PanelConfig> = {
-  Producer: {
-    titleKey: "roles.Producer",
-    nextRoleKey: "roles.Factory",
-    tipKeys: [
-      "dashboard.roles.producer.tip1",
-      "dashboard.roles.producer.tip2",
-      "dashboard.roles.producer.tip3",
-    ],
-    actions: [
-      { href: "/tokens/create", labelKey: "dashboard.roles.producer.actions.create" },
-      { href: "/transfers", labelKey: "dashboard.roles.producer.actions.transfer" },
-    ],
-  },
-  Factory: {
-    titleKey: "roles.Factory",
-    nextRoleKey: "roles.Retailer",
-    tipKeys: [
-      "dashboard.roles.factory.tip1",
-      "dashboard.roles.factory.tip2",
-      "dashboard.roles.factory.tip3",
-    ],
-    actions: [
-      { href: "/tokens/create", labelKey: "dashboard.roles.factory.actions.create" },
-      { href: "/transfers", labelKey: "dashboard.roles.factory.actions.transfer" },
-    ],
-  },
-  Retailer: {
-    titleKey: "roles.Retailer",
-    nextRoleKey: "roles.Consumer",
-    tipKeys: [
-      "dashboard.roles.retailer.tip1",
-      "dashboard.roles.retailer.tip2",
-      "dashboard.roles.retailer.tip3",
-    ],
-    actions: [{ href: "/transfers", labelKey: "dashboard.roles.retailer.actions.transfer" }],
-  },
-  Consumer: {
-    titleKey: "roles.Consumer",
-    tipKeys: [
-      "dashboard.roles.consumer.tip1",
-      "dashboard.roles.consumer.tip2",
-      "dashboard.roles.consumer.tip3",
-    ],
-    actions: [{ href: "/dashboard", labelKey: "dashboard.roles.consumer.actions.trace" }],
-  },
-} as const;
-
-const ADMIN_PANEL: PanelConfig = {
-  titleKey: "roles.Admin",
-  tipKeys: [
-    "dashboard.roles.admin.tip1",
-    "dashboard.roles.admin.tip2",
-    "dashboard.roles.admin.tip3",
-  ],
-  actions: [{ href: "/admin/users", labelKey: "dashboard.roles.admin.actions.manage" }],
-};
+import { useRoleTheme } from "@/hooks/useRoleTheme";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function Dashboard() {
   const { t } = useI18n();
+  useRequireAuth(); // Redirige a home si no hay cuenta
   const { account, mustConnect, error } = useWeb3();
-  const { activeRole, isApproved, loading: roleLoading, statusLabel, isAdmin } = useRole();
+  const { activeRole, isApproved, loading: roleLoading, statusLabel } = useRole();
+  const { theme } = useRoleTheme();
 
   const [tokens, setTokens] = useState<number[]>([]);
   const [balances, setBalances] = useState<Record<number, string>>({});
+  const [tokenNames, setTokenNames] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
+  const [pendingTransfers, setPendingTransfers] = useState<Array<{
+    id: number;
+    from: string;
+    to: string;
+    tokenId: number;
+    amount: bigint;
+    dateCreated: number;
+    status: number;
+    tokenName?: string;
+    direction: "in" | "out";
+  }>>([]);
+  const [txBusy, setTxBusy] = useState<Record<number, boolean>>({});
+  
+  const [createdSummary, setCreatedSummary] = useState<{ createdCount: number; totalSupplySum: bigint; availableSum: bigint; totalConsumedInputs: bigint } | null>(null);
+  const [inventorySummary, setInventorySummary] = useState<{ tokensWithBalance: number; totalBalance: bigint } | null>(null);
+  const [recent, setRecent] = useState<RecentItem[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [timelineCounts, setTimelineCounts] = useState<number[]>([]);
+  const [timelineMode, setTimelineMode] = useState<"count" | "volume">("count");
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
+  const [lastTxAction, setLastTxAction] = useState<string | null>(null);
+
+  // Helper: detect BlockOutOfRange and force full session cleanup
+  function handleBlockOutOfRange(err: unknown) {
+    const msg = (typeof err === "string" ? err : (err as any)?.message || "") as string;
+    if (/BlockOutOfRange|block height|eth_call/i.test(msg)) {
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.clear();
+          sessionStorage.clear();
+        }
+      } catch {}
+      try { resetProvider(); } catch {}
+      window.location.reload();
+      return true;
+    }
+    return false;
+  }
 
   const refreshBalances = useCallback(
     async ({ silent }: { silent?: boolean } = {}) => {
@@ -97,15 +81,22 @@ export default function Dashboard() {
         const ids = await getUserTokens(account);
         const nums = ids.map(Number);
         setTokens(nums);
-        const balPairs = await Promise.all(
-          nums.map(async id => {
-            const bal = await getTokenBalance(id, account);
-            return [id, bal.toString()] as const;
+        const entries = await Promise.all(
+          nums.map(async (id: number) => {
+            const [bal, name] = await Promise.all([
+              getTokenBalance(id, account).catch(() => 0n as any),
+              getTokenView(id).then(tv => String(tv[2])).catch(() => undefined),
+            ]);
+            const balStr = (typeof bal === 'bigint' ? bal : BigInt(bal)).toString();
+            return { id, balStr, name };
           })
         );
-        setBalances(Object.fromEntries(balPairs));
+        setBalances(Object.fromEntries(entries.map(e => [e.id, e.balStr])));
+        const nameMap: Record<number, string> = {};
+        for (const e of entries) if (e.name) nameMap[e.id] = e.name;
+        setTokenNames(nameMap);
       } catch (err: unknown) {
-        console.error(err);
+        if (!handleBlockOutOfRange(err)) console.error(err);
       } finally {
         if (!silent) setLoading(false);
       }
@@ -119,17 +110,406 @@ export default function Dashboard() {
 
   useBlockWatcher(() => refreshBalances({ silent: true }), [refreshBalances]);
 
-  const panel = useMemo(() => {
-    if (activeRole && (ROLE_PANELS as Record<string, PanelConfig | undefined>)[activeRole]) {
-      return ROLE_PANELS[activeRole as keyof typeof ROLE_PANELS];
+  // Load summaries for role dashboards
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      if (!account || mustConnect) { 
+        if (!cancel) { 
+          setCreatedSummary(null); 
+          setInventorySummary(null); 
+        } 
+        return; 
+      }
+      try {
+        const [created, inv] = await Promise.all([
+          getUserCreatedSummary(account).catch((err) => {
+            if (!handleBlockOutOfRange(err)) console.error("getUserCreatedSummary error:", err);
+            return null;
+          }),
+          getUserBalancesNonZero(account).catch((err) => {
+            if (!handleBlockOutOfRange(err)) console.error("getUserBalancesNonZero error:", err);
+            return null;
+          }),
+        ]);
+        if (cancel) return;
+        
+        // If queries fail, set default empty state instead of null
+        setCreatedSummary(created || { 
+          createdCount: 0, 
+          totalSupplySum: 0n, 
+          availableSum: 0n, 
+          totalConsumedInputs: 0n 
+        });
+        
+        if (inv) {
+          const total = inv.balances.reduce((acc, b) => acc + b, 0n as bigint);
+          setInventorySummary({ tokensWithBalance: inv.ids.length, totalBalance: total });
+        } else {
+          setInventorySummary({ tokensWithBalance: 0, totalBalance: 0n });
+        }
+      } catch (err) {
+        console.error("Dashboard summary load error:", err);
+        if (!cancel) { 
+          // Set defaults instead of null so UI shows something
+          setCreatedSummary({ 
+            createdCount: 0, 
+            totalSupplySum: 0n, 
+            availableSum: 0n, 
+            totalConsumedInputs: 0n 
+          });
+          setInventorySummary({ tokensWithBalance: 0, totalBalance: 0n });
+        }
+      }
+    })();
+    return () => { cancel = true; };
+  }, [account, mustConnect]);
+
+  // Load recent activity (transfers + creations) and build timeline buckets for current month (by day)
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      if (!account || mustConnect) { if (!cancel) { setRecent([]); setTimelineCounts([]); } return; }
+      try {
+        const [transferIds, createdTokenIds] = await Promise.all([
+          getUserTransfers(account).catch(() => [] as bigint[]),
+          getUserCreatedTokens(account).catch(() => [] as number[]),
+        ]);
+        const items: RecentItem[] = [];
+        // Transfers
+        for (const rawId of transferIds) {
+          try {
+            const id = Number(rawId);
+            const v = await getTransfer(id);
+            const to = String(v[2]);
+            const tokenId = Number(v[3]);
+            const date = Number(v[4]);
+            const amount = BigInt(v[5]);
+            const status = Number(v[6]) as 0 | 1 | 2 | 3;
+            const direction: "in" | "out" = to.toLowerCase() === account.toLowerCase() ? "in" : "out";
+            let tokenName: string | undefined = undefined;
+            try {
+              const tv = await getTokenView(tokenId);
+              tokenName = String(tv[2]);
+            } catch (err) { handleBlockOutOfRange(err); }
+            items.push({ type: "transfer", id, direction, status, tokenId, tokenName, amount, dateCreated: date });
+          } catch (err) { handleBlockOutOfRange(err); }
+        }
+        // Creations
+        for (const tokenId of createdTokenIds) {
+          try {
+            const tv = await getTokenView(Number(tokenId));
+            const name = String(tv[2]);
+            const totalSupply = BigInt(tv[4]);
+            const date = Number(tv[7]);
+            items.push({ type: "creation", id: Number(tokenId), tokenId: Number(tokenId), tokenName: name, totalSupply, dateCreated: date });
+          } catch (err) { handleBlockOutOfRange(err); }
+        }
+        // Build timeline buckets for current calendar month (UTC), one bucket per day
+        const now = new Date();
+        const y = now.getUTCFullYear();
+        const m = now.getUTCMonth(); // 0-11
+        const monthStartSec = Math.floor(Date.UTC(y, m, 1) / 1000);
+        const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+        const buckets = Array.from({ length: daysInMonth }, () => 0);
+        for (const it of items) {
+          const idx = Math.floor((it.dateCreated - monthStartSec) / 86400);
+          if (idx >= 0 && idx < daysInMonth) {
+            if (timelineMode === "count") {
+              buckets[idx] += 1;
+            } else {
+              if (it.type === "transfer") {
+                const n = Number(it.amount);
+                buckets[idx] += Number.isFinite(n) ? n : 0;
+              } else {
+                const n = Number(it.totalSupply);
+                buckets[idx] += Number.isFinite(n) ? n : 0;
+              }
+            }
+          }
+        }
+        items.sort((a,b) => b.dateCreated - a.dateCreated);
+        if (!cancel) {
+          setTimelineCounts(buckets);
+          setRecent(items.slice(0, 5));
+        }
+      } catch (err) {
+        console.error(err);
+        if (!cancel) { setRecent([]); setTimelineCounts([]); }
+      }
+    })();
+    return () => { cancel = true; };
+  }, [account, mustConnect, timelineMode]);
+
+  // Load pending transfers for this user (incoming and outgoing)
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      if (!account || mustConnect) {
+        if (!cancel) setPendingTransfers([]);
+        return;
+      }
+      try {
+        const ids: bigint[] = await getUserTransfers(account);
+        const rows: Array<{ id: number; from: string; to: string; tokenId: number; amount: bigint; dateCreated: number; status: number; tokenName?: string; direction: "in" | "out" }>
+          = [];
+        for (const raw of ids) {
+          try {
+            const id = Number(raw);
+            const v = await getTransfer(id);
+            const status = Number(v[6]);
+            const to = String(v[2]);
+            const from = String(v[1]);
+            const isPending = status === 0;
+            const isIncoming = to.toLowerCase() === account.toLowerCase();
+            const isOutgoing = from.toLowerCase() === account.toLowerCase();
+            if (isPending && (isIncoming || isOutgoing)) {
+              const tokenId = Number(v[3]);
+              let tokenName: string | undefined = undefined;
+              try {
+                const tv = await getTokenView(tokenId);
+                tokenName = String(tv[2]);
+              } catch (err) { handleBlockOutOfRange(err); }
+              rows.push({
+                id,
+                from,
+                to,
+                tokenId,
+                dateCreated: Number(v[4]),
+                amount: BigInt(v[5]),
+                status,
+                tokenName,
+                direction: isIncoming ? "in" : "out",
+              });
+            }
+          } catch (err) { handleBlockOutOfRange(err); }
+        }
+        if (!cancel) setPendingTransfers(rows.sort((a,b)=> b.dateCreated - a.dateCreated));
+      } catch (err) {
+        console.error(err);
+        if (!cancel) setPendingTransfers([]);
+      }
+    })();
+    return () => { cancel = true; };
+  }, [account, mustConnect]);
+
+  // Manual refresh: reload all on-chain sections in parallel
+  const refreshAll = useCallback(async ({ silent }: { silent?: boolean } = {}) => {
+    if (!account || mustConnect) {
+      // Reset to empty state if not connected
+      setTokens([]);
+      setBalances({});
+      setCreatedSummary({ createdCount: 0, totalSupplySum: 0n, availableSum: 0n, totalConsumedInputs: 0n });
+      setInventorySummary({ tokensWithBalance: 0, totalBalance: 0n });
+      setPendingTransfers([]);
+      setRecent([]);
+      return;
     }
-    if (isAdmin) return ADMIN_PANEL;
-    return undefined;
-  }, [activeRole, isAdmin]);
+
+    if (!silent) setRefreshing(true);
+    try {
+      await Promise.all([
+        // Balances and owned tokens
+        (async () => {
+          await refreshBalances({ silent: true });
+        })(),
+        // Created/inventory summaries
+        (async () => {
+          try {
+            const [created, inv] = await Promise.all([
+              getUserCreatedSummary(account).catch((err) => {
+                console.error("getUserCreatedSummary error:", err);
+                return null;
+              }),
+              getUserBalancesNonZero(account).catch((err) => {
+                console.error("getUserBalancesNonZero error:", err);
+                return null;
+              }),
+            ]);
+            setCreatedSummary(
+              created || {
+                createdCount: 0,
+                totalSupplySum: 0n,
+                availableSum: 0n,
+                totalConsumedInputs: 0n,
+              }
+            );
+            if (inv) {
+              const total = inv.balances.reduce((acc, b) => acc + b, 0n as bigint);
+              setInventorySummary({ tokensWithBalance: inv.ids.length, totalBalance: total });
+            } else {
+              setInventorySummary({ tokensWithBalance: 0, totalBalance: 0n });
+            }
+          } catch (err) {
+            console.error("Dashboard summary load error:", err);
+            setCreatedSummary({ createdCount: 0, totalSupplySum: 0n, availableSum: 0n, totalConsumedInputs: 0n });
+            setInventorySummary({ tokensWithBalance: 0, totalBalance: 0n });
+          }
+        })(),
+        // Recent activity and timeline (current month by day)
+        (async () => {
+          try {
+            const [transferIds, createdTokenIds] = await Promise.all([
+              getUserTransfers(account).catch(() => [] as bigint[]),
+              getUserCreatedTokens(account).catch(() => [] as number[]),
+            ]);
+            const items: RecentItem[] = [];
+            for (const rawId of transferIds) {
+              try {
+                const id = Number(rawId);
+                const v = await getTransfer(id);
+                const to = String(v[2]);
+                const tokenId = Number(v[3]);
+                const date = Number(v[4]);
+                const amount = BigInt(v[5]);
+                const status = Number(v[6]) as 0 | 1 | 2 | 3;
+                const direction: "in" | "out" = to.toLowerCase() === account.toLowerCase() ? "in" : "out";
+                let tokenName: string | undefined = undefined;
+                try {
+                  const tv = await getTokenView(tokenId);
+                  tokenName = String(tv[2]);
+                } catch {}
+                items.push({ type: "transfer", id, direction, status, tokenId, tokenName, amount, dateCreated: date });
+              } catch {}
+            }
+            // Add creations
+            for (const tokenId of createdTokenIds) {
+              try {
+                const tv = await getTokenView(Number(tokenId));
+                const name = String(tv[2]);
+                const totalSupply = BigInt(tv[4]);
+                const date = Number(tv[7]);
+                items.push({ type: "creation", id: Number(tokenId), tokenId: Number(tokenId), tokenName: name, totalSupply, dateCreated: date });
+              } catch {}
+            }
+            const now = new Date();
+            const y = now.getUTCFullYear();
+            const m = now.getUTCMonth();
+            const monthStartSec = Math.floor(Date.UTC(y, m, 1) / 1000);
+            const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+            const counts = Array.from({ length: daysInMonth }, () => 0);
+            for (const it of items) {
+              const idx = Math.floor((it.dateCreated - monthStartSec) / 86400);
+              if (idx >= 0 && idx < daysInMonth) {
+                if (timelineMode === "count") {
+                  counts[idx] += 1;
+                } else {
+                  if (it.type === "transfer") {
+                    const n = Number(it.amount);
+                    counts[idx] += Number.isFinite(n) ? n : 0;
+                  } else {
+                    const n = Number(it.totalSupply);
+                    counts[idx] += Number.isFinite(n) ? n : 0;
+                  }
+                }
+              }
+            }
+            items.sort((a, b) => b.dateCreated - a.dateCreated);
+            setTimelineCounts(counts);
+            setRecent(items.slice(0, 5));
+          } catch (err) {
+            console.error(err);
+            setRecent([]);
+            setTimelineCounts([]);
+          }
+        })(),
+        // Pending transfers (incoming and outgoing)
+        (async () => {
+          try {
+            const ids: bigint[] = await getUserTransfers(account);
+            const rows: Array<{
+              id: number;
+              from: string;
+              to: string;
+              tokenId: number;
+              amount: bigint;
+              dateCreated: number;
+              status: number;
+              tokenName?: string;
+              direction: "in" | "out";
+            }> = [];
+            for (const raw of ids) {
+              try {
+                const id = Number(raw);
+                const v = await getTransfer(id);
+                const status = Number(v[6]);
+                const to = String(v[2]);
+                const from = String(v[1]);
+                const isPending = status === 0;
+                const isIncoming = to.toLowerCase() === account.toLowerCase();
+                const isOutgoing = from.toLowerCase() === account.toLowerCase();
+                if (isPending && (isIncoming || isOutgoing)) {
+                  const tokenId = Number(v[3]);
+                  let tokenName: string | undefined = undefined;
+                  try {
+                    const tv = await getTokenView(tokenId);
+                    tokenName = String(tv[2]);
+                  } catch {}
+                  rows.push({
+                    id,
+                    from,
+                    to,
+                    tokenId,
+                    dateCreated: Number(v[4]),
+                    amount: BigInt(v[5]),
+                    status,
+                    tokenName,
+                    direction: isIncoming ? "in" : "out",
+                  });
+                }
+              } catch {}
+            }
+            setPendingTransfers(rows.sort((a, b) => b.dateCreated - a.dateCreated));
+          } catch (err) {
+            console.error(err);
+            setPendingTransfers([]);
+          }
+        })(),
+      ]);
+    } finally {
+      if (!silent) setRefreshing(false);
+    }
+  }, [account, mustConnect, refreshBalances, timelineMode]);
+  
+  const handleAccept = useCallback(async (id: number) => {
+    setTxBusy(prev => ({ ...prev, [id]: true }));
+    try {
+      const result = await acceptTransfer(BigInt(id));
+      setLastTxHash(result.txHash);
+      setLastTxAction(`Transferencia #${id} aceptada`);
+      // Optimistic update then full refresh of all on-chain sections
+      setPendingTransfers(prev => prev.filter(t => t.id !== id));
+      await refreshAll();
+    } catch (err) {
+      const message = getErrorMessage(err, "Error accepting transfer");
+      if (message) console.error(message);
+    } finally {
+      setTxBusy(prev => ({ ...prev, [id]: false }));
+    }
+  }, [refreshAll]);
+
+  const handleReject = useCallback(async (id: number) => {
+    setTxBusy(prev => ({ ...prev, [id]: true }));
+    try {
+      const result = await rejectTransfer(BigInt(id));
+      setLastTxHash(result.txHash);
+      setLastTxAction(`Transferencia #${id} rechazada`);
+      setPendingTransfers(prev => prev.filter(t => t.id !== id));
+      await refreshAll();
+    } catch (err) {
+      const message = getErrorMessage(err, "Error rejecting transfer");
+      if (message) console.error(message);
+    } finally {
+      setTxBusy(prev => ({ ...prev, [id]: false }));
+    }
+  }, [refreshAll]);
+
+  // Background refresh of all sections on each new block (silent, no header spinner)
+  useBlockWatcher(() => { void refreshAll({ silent: true }); }, [refreshAll]);
 
   if (mustConnect) {
     return (
-      <div className="rounded-3xl border border-slate-200/70 bg-white/80 p-6 text-sm text-slate-600 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70 dark:text-slate-300">
+      <div className="rounded-3xl border border-surface bg-surface-1 p-6 text-sm text-slate-600 shadow-sm dark:text-slate-300">
         {t("dashboard.connectPrompt")}
       </div>
     );
@@ -137,7 +517,7 @@ export default function Dashboard() {
 
   if (error) return <p className="text-sm text-rose-600 dark:text-rose-300">{error}</p>;
 
-  if (!roleLoading && !isApproved && !isAdmin) {
+  if (!roleLoading && !isApproved) {
     return (
       <div className="space-y-3 rounded-3xl border border-amber-300/60 bg-amber-50/70 p-6 text-sm text-amber-900 shadow-sm dark:border-amber-300/40 dark:bg-amber-500/10 dark:text-amber-100">
         <p className="font-semibold">{t("dashboard.pending.title")}</p>
@@ -152,72 +532,85 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <section className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("dashboard.inventory.title")}</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t("dashboard.inventory.subtitle")}</p>
-            </div>
-            <button
-              onClick={() => refreshBalances()}
-              disabled={loading}
-              className="rounded-full border border-slate-300/70 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200"
-            >
-              {loading ? t("dashboard.inventory.refreshing") : t("dashboard.inventory.refresh")}
-            </button>
+    <div className={`space-y-6 rounded-[28px] border ${theme.accentBorder} ${theme.background} p-6 shadow-xl shadow-black/5`}>
+      <header className={`rounded-3xl bg-gradient-to-r ${theme.gradient} px-6 py-5 text-white shadow-lg`}>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.35em] opacity-80">{theme.label}</p>
+            <h1 className="text-2xl font-semibold">{theme.icon} {t("dashboard.inventory.title")}</h1>
+            <p className="mt-2 max-w-4xl text-sm opacity-90">{t("dashboard.inventory.subtitle")}</p>
           </div>
+            <button
+              type="button"
+              onClick={() => refreshAll()}
+              disabled={refreshing}
+              className="rounded-full border border-white/60 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-60"
+            >
+              {refreshing ? t("dashboard.inventory.refreshing") : t("dashboard.inventory.refresh")}
+            </button>
+        </div>
+      </header>
 
-          <div className="grid gap-3">
-            {tokens.length === 0 && !loading ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">{t("dashboard.inventory.empty")}</p>
-            ) : null}
-            {tokens.map(id => (
-              <div
-                key={id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("dashboard.inventory.token", { id })}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{t("dashboard.inventory.balanceLabel")}</p>
-                </div>
-                <span className="text-lg font-semibold text-indigo-600 dark:text-indigo-300">{balances[id] ?? "…"}</span>
+      {lastTxHash && lastTxAction && (
+        <section className="rounded-3xl border border-emerald-200 bg-emerald-50/80 dark:bg-emerald-900/20 dark:border-emerald-700 p-5 shadow-lg">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">✅</span>
+            <div className="flex-1 space-y-2">
+              <h3 className="text-lg font-semibold text-emerald-900 dark:text-emerald-100">
+                {lastTxAction}
+              </h3>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Hash de transacción:</p>
+                <code className="block rounded-lg bg-emerald-100 dark:bg-emerald-900/40 px-3 py-2 text-xs font-mono text-emerald-900 dark:text-emerald-100 break-all">
+                  {lastTxHash}
+                </code>
               </div>
-            ))}
+              <button
+                onClick={() => {
+                  setLastTxHash(null);
+                  setLastTxAction(null);
+                }}
+                className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-100 underline"
+              >
+                Cerrar mensaje
+              </button>
+            </div>
           </div>
         </section>
+      )}
 
-        {panel ? (
-          <aside className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
-            <div className="space-y-1">
-              <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t(panel.titleKey)}</h3>
-              {panel.nextRoleKey ? (
-                <p className="text-xs text-slate-500 dark:text-slate-400">{t("dashboard.panel.next", { role: t(panel.nextRoleKey) })}</p>
-              ) : null}
-            </div>
-            <ul className="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
-              {panel.tipKeys.map(tipKey => (
-                <li key={tipKey} className="rounded-xl border border-slate-200/60 bg-white/80 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/70">
-                  {t(tipKey)}
-                </li>
-              ))}
-            </ul>
-            {panel.actions.length ? (
-              <div className="flex flex-wrap gap-2">
-                {panel.actions.map(action => (
-                  <Link
-                    key={action.href}
-                    href={action.href}
-                    className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                  >
-                    {t(action.labelKey)}
-                  </Link>
-                ))}
-              </div>
-            ) : null}
-          </aside>
-        ) : null}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Columna izquierda: apilado vertical */}
+        <div className="space-y-6">
+          <StatsSection
+            createdSummary={createdSummary}
+            inventorySummary={inventorySummary}
+            pendingCount={pendingTransfers.length}
+            activeRole={activeRole}
+            t={t}
+          />
+          <PendingTransfersSection
+            t={t}
+            items={pendingTransfers}
+            txBusy={txBusy}
+            onAccept={handleAccept}
+            onReject={handleReject}
+          />
+          <RecentTransfers items={recent} />
+        </div>
+
+        {/* Columna derecha: apilado vertical */}
+        <div className="space-y-6">
+          <TimelineSection
+            t={t}
+            counts={timelineCounts}
+            mode={timelineMode}
+            setMode={m => setTimelineMode(m)}
+            barColor={theme.accentHex}
+          />
+          <TokensSection t={t} tokens={tokens} balances={balances} names={tokenNames} loading={loading} />
+          
+        </div>
       </div>
     </div>
   );

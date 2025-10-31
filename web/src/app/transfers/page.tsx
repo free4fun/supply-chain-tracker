@@ -12,16 +12,42 @@ import {
   acceptTransfer,
   getTransfer,
   getTokenBalance,
+  getTokenView,
   getUserTokens,
   getUserTransfers,
   listUsers,
   rejectTransfer,
+  cancelTransfer,
   transfer,
   type UserView,
+  getUserInfo,
 } from "@/lib/sc";
 import { useI18n } from "@/contexts/I18nContext";
+import { useRoleTheme } from "@/hooks/useRoleTheme";
+import { getErrorMessage } from "@/lib/errors";
+import { getCurrentContractAddress, resetProvider } from "@/lib/web3";
+import TokenDetailModal from "@/components/TokenDetailModal";
+import { getTokenDetail } from "@/lib/tokenDetail";
+import { TokenTxHash } from "@/components/TokenTxHash";
+// Helper: detect BlockOutOfRange and force full session cleanup
+function handleBlockOutOfRange(err: unknown) {
+  const msg = (typeof err === "string" ? err : (err as any)?.message || "") as string;
+  if (/BlockOutOfRange|block height|eth_call/i.test(msg)) {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+    } catch {}
+    try { resetProvider(); } catch {}
+    window.location.reload();
+    return true;
+  }
+  return false;
+}
 
-const STATUS_LABELS = ["Pending", "Accepted", "Rejected"] as const;
+// Status keys for i18n lookup (added Cancelled)
+const STATUS_KEYS = ["Pending", "Accepted", "Rejected", "Cancelled"] as const;
 const NEXT_ROLE: Record<string, string | null> = {
   Producer: "Factory",
   Factory: "Retailer",
@@ -29,15 +55,17 @@ const NEXT_ROLE: Record<string, string | null> = {
   Consumer: null,
 };
 
-type TransferRow = { id: number; from: string; to: string; tokenId: number; amount: number; status: number };
-type TokenOption = { id: number; balance: string };
-type RecipientOption = { addr: string; role: string };
+type TransferRow = { id: number; from: string; to: string; tokenId: number; amount: number; status: number; tokenName?: string; fromDisplay?: string; toDisplay?: string; contract: string };
+type TokenOption = { id: number; available: string; name?: string };
+type RecipientOption = { addr: string; role: string; company?: string; firstName?: string; lastName?: string };
 
 export default function TransfersPage() {
   const { account, mustConnect } = useWeb3();
   const { activeRole, isApproved, loading: roleLoading, statusLabel, isAdmin } = useRole();
   const { push } = useToast();
   const { t } = useI18n();
+  const { theme } = useRoleTheme();
+  const [contractAddr, setContractAddr] = useState<string>(() => getCurrentContractAddress().toLowerCase());
 
   const schema = useMemo(
     () =>
@@ -62,6 +90,10 @@ export default function TransfersPage() {
   const [loadingTransfers, setLoadingTransfers] = useState(false);
   const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [loadingTokens, setLoadingTokens] = useState(false);
+  const [availableByToken, setAvailableByToken] = useState<Record<number, bigint>>({});
+  const [modalTokenId, setModalTokenId] = useState<number | null>(null);
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
+  const [lastTxAction, setLastTxAction] = useState<string | null>(null);
 
   const nextRole = activeRole ? NEXT_ROLE[activeRole] : undefined;
   const canCreate = Boolean(activeRole && ["Producer", "Factory", "Retailer"].includes(activeRole));
@@ -76,30 +108,64 @@ export default function TransfersPage() {
       if (!silent) setLoadingTransfers(true);
       try {
         const ids = await getUserTransfers(account);
+        const sourceContract = getCurrentContractAddress().toLowerCase();
         const inc: TransferRow[] = [];
         const out: TransferRow[] = [];
+        const labelCache: Record<string, string> = {};
+        const short = (addr: string) => `${addr.slice(0,6)}…${addr.slice(-4)}`;
+        const buildLabel = async (addr: string): Promise<string> => {
+          if (labelCache[addr]) return labelCache[addr];
+          try {
+            const u: any = await getUserInfo(addr);
+            // Expect tuple: [id, userAddress, role, pendingRole, status, company, firstName, lastName]
+            const company = String(u[5] ?? "").trim();
+            const first = String(u[6] ?? "").trim();
+            const last = String(u[7] ?? "").trim();
+            const name = `${first} ${last}`.trim();
+            const composed = [company || undefined, name || undefined].filter(Boolean).join(" • ");
+            const label = composed || short(addr);
+            labelCache[addr] = label;
+            return label;
+          } catch {
+            const label = short(addr);
+            labelCache[addr] = label;
+            return label;
+          }
+        };
         for (const id of ids) {
           try {
             const t = await getTransfer(Number(id));
+            const tokenId = Number(t[3]);
+            let tokenName: string | undefined = undefined;
+            try {
+              const tv = await getTokenView(tokenId);
+              tokenName = String(tv[2]);
+            } catch (err) { handleBlockOutOfRange(err); }
             const row: TransferRow = {
               id: Number(t[0]),
               from: t[1],
               to: t[2],
-              tokenId: Number(t[3]),
+              tokenId,
               amount: Number(t[5]),
               status: Number(t[6]),
+              tokenName,
+              contract: sourceContract,
             };
+            // Attach display labels for origin/destination
+            try { row.fromDisplay = await buildLabel(row.from); } catch {}
+            try { row.toDisplay = await buildLabel(row.to); } catch {}
             if (row.to.toLowerCase() === account.toLowerCase()) inc.push(row);
             if (row.from.toLowerCase() === account.toLowerCase()) out.push(row);
           } catch (err: unknown) {
-            console.error(err);
+            handleBlockOutOfRange(err) || console.error(err);
           }
         }
-        const byStatus = (a: TransferRow, b: TransferRow) => a.status - b.status || a.id - b.id;
-        setIncoming(inc.sort(byStatus));
-        setOutgoing(out.sort(byStatus));
+        // Sort by status first (pending first), then by ID in reverse chronological order (newest first)
+        const byStatusThenIdDesc = (a: TransferRow, b: TransferRow) => a.status - b.status || b.id - a.id;
+        setIncoming(inc.sort(byStatusThenIdDesc));
+        setOutgoing(out.sort(byStatusThenIdDesc));
       } catch (err: unknown) {
-        console.error(err);
+        handleBlockOutOfRange(err) || console.error(err);
       } finally {
         if (!silent) setLoadingTransfers(false);
       }
@@ -118,17 +184,46 @@ export default function TransfersPage() {
       try {
         const ids = await getUserTokens(account);
         const options: TokenOption[] = [];
+        // Build pending outgoing per token to compute "available"
+        const pendingMap: Record<number, bigint> = {};
+        try {
+          const txIds = await getUserTransfers(account);
+          for (const rid of txIds) {
+            try {
+              const v = await getTransfer(Number(rid));
+              const from = String(v[1]).toLowerCase();
+              const status = Number(v[6]);
+              if (from === account.toLowerCase() && status === 0) {
+                const tok = Number(v[3]);
+                const amt = BigInt(v[5]);
+                pendingMap[tok] = (pendingMap[tok] ?? 0n) + amt;
+              }
+            } catch (err) { handleBlockOutOfRange(err); }
+          }
+        } catch (err) { handleBlockOutOfRange(err); }
         for (const id of ids) {
           try {
+            // Only allow transferring tokens CREATED by the current account
+            const tv = await getTokenView(Number(id));
+            const creator = String(tv[1] ?? "").toLowerCase();
+            if (creator !== account.toLowerCase()) continue; // skip received tokens
+
             const balance = await getTokenBalance(Number(id), account);
-            options.push({ id: Number(id), balance: balance.toString() });
+            const asBigInt = BigInt(balance);
+            const pending = pendingMap[Number(id)] ?? 0n;
+            const available = asBigInt > pending ? asBigInt - pending : 0n;
+            if (available > 0n) {
+              const name: string | undefined = String(tv[2] ?? `Token ${Number(id)}`);
+              options.push({ id: Number(id), available: available.toString(), name });
+            }
           } catch (err) {
-            console.error(err);
+            handleBlockOutOfRange(err) || console.error(err);
           }
         }
         setTokenOptions(options);
+        setAvailableByToken(Object.fromEntries(options.map(o => [o.id, BigInt(o.available)])));
       } catch (err: unknown) {
-        console.error(err);
+        handleBlockOutOfRange(err) || console.error(err);
       } finally {
         if (!silent) setLoadingTokens(false);
       }
@@ -146,7 +241,7 @@ export default function TransfersPage() {
       try {
         const users = await listUsers();
         const approved = users.filter(u => u.status === 1 && u.role === nextRole);
-        const opts: RecipientOption[] = approved.map((u: UserView) => ({ addr: u.addr, role: u.role }));
+        const opts: RecipientOption[] = approved.map((u: UserView) => ({ addr: u.addr, role: u.role, company: u.company, firstName: u.firstName, lastName: u.lastName }));
         setRecipientOptions(opts);
       } catch (err: unknown) {
         console.error(err);
@@ -156,6 +251,41 @@ export default function TransfersPage() {
     },
     [nextRole]
   );
+
+  // Detect cambios de dirección de contrato vía eventos de storage
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "contract.address") {
+        const next = getCurrentContractAddress().toLowerCase();
+        if (next !== contractAddr) {
+          setContractAddr(next);
+          // Limpiar listas y refrescar del contrato actual
+          setIncoming([]);
+          setOutgoing([]);
+          void refreshTransfers();
+          void refreshTokens({ silent: true });
+          void refreshRecipients({ silent: true });
+        }
+      }
+    };
+    const onCustom = () => {
+      const next = getCurrentContractAddress().toLowerCase();
+      if (next !== contractAddr) {
+        setContractAddr(next);
+        setIncoming([]);
+        setOutgoing([]);
+        void refreshTransfers();
+        void refreshTokens({ silent: true });
+        void refreshRecipients({ silent: true });
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("contract.address.changed", onCustom as EventListener);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("contract.address.changed", onCustom as EventListener);
+    };
+  }, [contractAddr, refreshRecipients, refreshTokens, refreshTransfers]);
 
   useEffect(() => {
     void refreshTransfers();
@@ -216,15 +346,38 @@ export default function TransfersPage() {
       push("error", parsed.error.issues[0].message);
       return;
     }
+    // Additional guard: ensure amount <= available considering pending outgoing transfers
+    try {
+      const tokId = Number(parsed.data.tokenId);
+      const amt = BigInt(parsed.data.amount);
+      const available = availableByToken[tokId] ?? 0n;
+      if (amt > available) {
+        push("error", t("transfers.errors.insufficientAvailable"));
+        return;
+      }
+    } catch {}
     try {
       setPending(true);
-      await transfer(parsed.data.recipient, BigInt(parsed.data.tokenId), parsed.data.amount);
+      // Guard: only allow transferring tokens created by the sender
+      try {
+        const tokId = Number(parsed.data.tokenId);
+        const tv = await getTokenView(tokId);
+        const creator = String(tv[1] ?? "").toLowerCase();
+        if (!account || creator !== account.toLowerCase()) {
+          push("error", t("transfers.errors.generatedOnly"));
+          setPending(false);
+          return;
+        }
+      } catch {}
+      const result = await transfer(parsed.data.recipient, BigInt(parsed.data.tokenId), parsed.data.amount);
+      setLastTxHash(result.txHash);
+      setLastTxAction(result.transferId ? `Transferencia #${result.transferId} creada` : "Transferencia creada");
       push("success", t("transfers.success.created"));
       await refreshTransfers();
       await refreshTokens({ silent: true });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t("transfers.errors.transaction");
-      push("error", message);
+      const message = getErrorMessage(err, t("transfers.errors.transaction"));
+      if (message) push("error", message);
     } finally {
       setPending(false);
     }
@@ -244,12 +397,61 @@ export default function TransfersPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
+    <div className={`space-y-8 rounded-[28px] border ${theme.containerBorder} ${theme.background} p-6 shadow-xl shadow-black/5`}>
+      <header className={`rounded-3xl bg-gradient-to-r ${theme.gradient} px-6 py-5 text-white shadow-lg`}>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.35em] opacity-80">{theme.label}</p>
+            <h1 className="text-2xl font-semibold">{theme.icon} {t("nav.transfers")}</h1>
+            <p className="mt-1 max-w-4xl text-sm opacity-90">{theme.intro}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              refreshTransfers();
+              refreshTokens({ silent: true });
+              refreshRecipients({ silent: true });
+            }}
+            disabled={loadingTransfers}
+            className="rounded-full border border-white/60 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-60"
+          >
+            {loadingTransfers ? t("transfers.refreshing") : t("transfers.refresh")}
+          </button>
+        </div>
+      </header>
+
+      {lastTxHash && lastTxAction && (
+        <section className="rounded-3xl border border-emerald-200 bg-emerald-50/80 dark:bg-emerald-900/20 dark:border-emerald-700 p-5 shadow-lg">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">✅</span>
+            <div className="flex-1 space-y-2">
+              <h3 className="text-lg font-semibold text-emerald-900 dark:text-emerald-100">
+                {lastTxAction}
+              </h3>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Hash de transacción:</p>
+                <code className="block rounded-lg bg-emerald-100 dark:bg-emerald-900/40 px-3 py-2 text-xs font-mono text-emerald-900 dark:text-emerald-100 break-all">
+                  {lastTxHash}
+                </code>
+              </div>
+              <button
+                onClick={() => {
+                  setLastTxHash(null);
+                  setLastTxAction(null);
+                }}
+                className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-100 underline"
+              >
+                Cerrar mensaje
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+  <section className={`space-y-4 rounded-3xl border bg-white dark:bg-slate-900 p-6 shadow-inner ${theme.containerBorder}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">{t("transfers.title")}</h1>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t("transfers.title")}</h2>
           {nextRole ? (
-            <span className="rounded-full border border-indigo-300/60 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-600 dark:border-indigo-500/40 dark:text-indigo-300">
+            <span className="rounded-full border px-3 py-1 text-xs font-semibold border-accent text-accent">
               {t("transfers.allowedRecipients", { role: nextRole })}
             </span>
           ) : (
@@ -262,7 +464,7 @@ export default function TransfersPage() {
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
               {t("transfers.form.token")}
               <select
-                className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                className={`mt-1 w-full rounded-xl border bg-surface-2 px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-200 shadow-sm transition ${theme.inputBorder} hover:border-accent ${theme.inputFocusBorder} focus-visible:outline-none`}
                 value={selectedToken}
                 onChange={event => setSelectedToken(event.target.value)}
               >
@@ -271,7 +473,7 @@ export default function TransfersPage() {
                 </option>
                 {tokenOptions.map(option => (
                   <option key={option.id} value={option.id}>
-                    #{option.id} — Balance {option.balance}
+                    #{option.id} — {option.name ?? `Token ${option.id}`} — {option.available}
                   </option>
                 ))}
               </select>
@@ -280,7 +482,7 @@ export default function TransfersPage() {
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
               {t("transfers.form.amount")}
               <input
-                className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                className={`mt-1 w-full rounded-xl border bg-surface-2 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 shadow-sm transition ${theme.inputBorder} hover:border-accent ${theme.inputFocusBorder} focus-visible:outline-none`}
                 value={amount}
                 onChange={event => setAmount(event.target.value)}
                 placeholder={t("transfers.form.amountPlaceholder")}
@@ -292,7 +494,7 @@ export default function TransfersPage() {
             <label className="text-sm font-medium text-slate-600 dark:text-slate-300 md:col-span-2">
               {t("transfers.form.recipient")}
               <select
-                className="mt-1 w-full rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                className={`mt-1 w-full rounded-xl border bg-surface-2 px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-200 shadow-sm transition ${theme.inputBorder} hover:border-accent ${theme.inputFocusBorder} focus-visible:outline-none`}
                 value={selectedRecipient}
                 onChange={event => setSelectedRecipient(event.target.value)}
               >
@@ -305,7 +507,7 @@ export default function TransfersPage() {
                 </option>
                 {recipientOptions.map(option => (
                   <option key={option.addr} value={option.addr}>
-                    {option.addr}
+                    {`${option.company ?? ""}${option.company ? " • " : ""}${(option.firstName || option.lastName) ? `${option.firstName ?? ""} ${option.lastName ?? ""}`.trim() + " • " : ""}${option.addr}`}
                   </option>
                 ))}
                 <option value="__custom">{t("transfers.form.customRecipient")}</option>
@@ -314,7 +516,7 @@ export default function TransfersPage() {
 
             {selectedRecipient === "__custom" ? (
               <input
-                className="md:col-span-2 rounded-xl border border-slate-300/70 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                className={`md:col-span-2 rounded-xl border bg-surface-2 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 shadow-sm transition ${theme.inputBorder} hover:border-accent ${theme.inputFocusBorder} focus-visible:outline-none`}
                 value={customRecipient}
                 onChange={event => setCustomRecipient(event.target.value)}
                 placeholder="0x..."
@@ -324,7 +526,7 @@ export default function TransfersPage() {
             <div className="md:col-span-2 flex justify-end">
               <button
                 disabled={disabled}
-                className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:brightness-110 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                className={`rounded-full px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:brightness-110 disabled:opacity-60 bg-gradient-to-r ${theme.gradient}`}
               >
                 {pending ? t("transfers.form.creating") : t("transfers.form.submit")}
               </button>
@@ -335,84 +537,187 @@ export default function TransfersPage() {
         )}
       </section>
 
-      <section className="space-y-3 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
+  <section className={`space-y-3 rounded-3xl border bg-white dark:bg-slate-900 p-6 shadow-inner ${theme.containerBorder}`}>
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("transfers.incoming.title")}</h2>
-          <button
-            onClick={() => refreshTransfers()}
-            disabled={loadingTransfers}
-            className="rounded-full border border-slate-300/70 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200"
-          >
-            {loadingTransfers ? t("transfers.refreshing") : t("transfers.refresh")}
-          </button>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t("transfers.incoming.title")}</h2>
+          
         </div>
         <div className="grid gap-3">
           {incoming.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">{t("transfers.incoming.empty")}</p> : null}
           {incoming.map(row => (
             <div
               key={row.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+              onClick={() => setModalTokenId(row.tokenId)}
+              className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3 cursor-pointer transition ${theme.cardBorder} ${theme.cardHoverBorder} ${theme.cardHoverShadow}`}
             >
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("transfers.incoming.rowTitle", { id: row.id, token: row.tokenId, amount: row.amount })}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{t("transfers.incoming.from", { address: row.from })}</p>
-                <p className="text-xs text-indigo-600 dark:text-indigo-300">{t("transfers.status", { status: STATUS_LABELS[row.status as 0 | 1 | 2] ?? String(row.status) })}</p>
+                <p className="text-left text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  #{row.tokenId} · {row.tokenName ?? `Token ${row.tokenId}`} · {row.amount}
+                </p>
+                <div className="mt-1">
+                  <TokenTxHash tokenId={row.tokenId} chainId={31337} showFull={true} />
+                </div>
+                <p className="text-xs mt-1 text-slate-500 dark:text-slate-400">{t("transfers.incoming.from", { address: `${row.fromDisplay ?? row.from}` })}</p>
+                <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                  row.status === 1 
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-300"
+                    : row.status === 2
+                    ? "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500 dark:bg-rose-950 dark:text-rose-300"
+                    : "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500 dark:bg-amber-950 dark:text-amber-300"
+                }`}>
+                  {t("transfers.status", { status: t(`dashboard.status.${STATUS_KEYS[row.status as 0 | 1 | 2 | 3] ?? String(row.status)}`) })}
+                </span>
               </div>
-              <div className="flex gap-2">
-                <button
-                  className="rounded-full border border-slate-300/70 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-green-400 hover:text-green-600 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200"
-                  onClick={async () => {
-                    try {
-                      await acceptTransfer(BigInt(row.id));
-                      push("success", t("transfers.success.accepted"));
-                      await refreshTransfers();
-                    } catch (err: unknown) {
-                      const message = err instanceof Error ? err.message : t("transfers.errors.operation");
-                      push("error", message);
-                    }
-                  }}
-                  disabled={row.status !== 0 || !account}
-                >
-                  {t("transfers.actions.accept")}
-                </button>
-                <button
-                  className="rounded-full border border-slate-300/70 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-rose-400 hover:text-rose-600 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200"
-                  onClick={async () => {
-                    try {
-                      await rejectTransfer(BigInt(row.id));
-                      push("success", t("transfers.success.rejected"));
-                      await refreshTransfers();
-                    } catch (err: unknown) {
-                      const message = err instanceof Error ? err.message : t("transfers.errors.operation");
-                      push("error", message);
-                    }
-                  }}
-                  disabled={row.status !== 0 || !account}
-                >
-                  {t("transfers.actions.reject")}
-                </button>
-              </div>
+              {row.status === 0 ? (
+                <div className="flex gap-2">
+                  <button
+                    className="rounded-full border border-emerald-400 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60 dark:text-emerald-300"
+                    onClick={async () => {
+                      try {
+                        const result = await acceptTransfer(BigInt(row.id));
+                        setLastTxHash(result.txHash);
+                        setLastTxAction(`Transferencia #${row.id} aceptada`);
+                        push("success", t("transfers.success.accepted"));
+                        await refreshTransfers();
+                      } catch (err: unknown) {
+                        const message = getErrorMessage(err, t("transfers.errors.operation"));
+                        if (message) push("error", message);
+                      }
+                    }}
+                    disabled={!account}
+                  >
+                    {t("transfers.actions.accept")}
+                  </button>
+                  <button
+                    className="rounded-full border border-rose-400 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60 dark:text-rose-300"
+                    onClick={async () => {
+                      try {
+                        const result = await rejectTransfer(BigInt(row.id));
+                        setLastTxHash(result.txHash);
+                        setLastTxAction(`Transferencia #${row.id} rechazada`);
+                        push("success", t("transfers.success.rejected"));
+                        await refreshTransfers();
+                      } catch (err: unknown) {
+                        const message = getErrorMessage(err, t("transfers.errors.operation"));
+                        if (message) push("error", message);
+                      }
+                    }}
+                    disabled={!account}
+                  >
+                    {t("transfers.actions.reject")}
+                  </button>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
       </section>
 
-      <section className="space-y-3 rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-inner dark:border-slate-800/60 dark:bg-slate-900/80">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("transfers.outgoing.title")}</h2>
+  <section className={`space-y-3 rounded-3xl border bg-white dark:bg-slate-900 p-6 shadow-inner ${theme.containerBorder}`}>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t("transfers.outgoing.title")}</h2>
         <div className="grid gap-3">
           {outgoing.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">{t("transfers.outgoing.empty")}</p> : null}
           {outgoing.map(row => (
             <div
               key={row.id}
-              className="rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+              onClick={() => setModalTokenId(row.tokenId)}
+              className={`rounded-2xl border bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3 cursor-pointer transition ${theme.cardBorder} ${theme.cardHoverBorder} ${theme.cardHoverShadow}`}
             >
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("transfers.outgoing.rowTitle", { id: row.id, token: row.tokenId, amount: row.amount })}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t("transfers.outgoing.to", { address: row.to })}</p>
-              <p className="text-xs text-indigo-600 dark:text-indigo-300">{t("transfers.status", { status: STATUS_LABELS[row.status as 0 | 1 | 2] ?? String(row.status) })}</p>
+              <p className="text-left text-sm font-semibold text-slate-800 dark:text-slate-100">
+                #{row.tokenId} · {row.tokenName ?? `Token ${row.tokenId}`} · {row.amount}
+              </p>
+              <div className="mt-1">
+                <TokenTxHash tokenId={row.tokenId} chainId={31337} showFull={true} />
+              </div>
+              <p className="text-xs mt-1 text-slate-500 dark:text-slate-400">{t("transfers.outgoing.to", { address: `${row.toDisplay ?? row.to}` })}</p>
+              <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                row.status === 1 
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-300"
+                  : row.status === 2
+                  ? "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500 dark:bg-rose-950 dark:text-rose-300"
+                  : row.status === 3
+                  ? "border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-300"
+                  : "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500 dark:bg-amber-950 dark:text-amber-300"
+              }`}>
+                {t("transfers.status", { status: t(`dashboard.status.${STATUS_KEYS[row.status as 0 | 1 | 2 | 3] ?? String(row.status)}`) })}
+              </span>
+              {row.status === 0 ? (
+                <div className="mt-2 flex gap-2">
+                  <button
+                    className="rounded-full border border-rose-400 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60 dark:text-rose-300"
+                    onClick={async () => {
+                      try {
+                        // Preflight: ensure caller is sender and transfer is still pending
+                        try {
+                          // Si el contrato cambió desde que se listó, refrescar y abortar
+                          const currentAddr = getCurrentContractAddress().toLowerCase();
+                          if (currentAddr !== row.contract) {
+                            push("info", "Se actualizó el contrato. Refrescando la lista…");
+                            await refreshTransfers();
+                            return;
+                          }
+                          const v = await getTransfer(Number(row.id));
+                          const from = String(v[1] ?? (v as any).from ?? "");
+                          const status = Number(v[6] ?? (v as any).status ?? -1);
+                          if (!account || from.toLowerCase() !== account.toLowerCase()) {
+                            push("error", t("transfers.errors.cancelNotSender"));
+                            await refreshTransfers({ silent: true });
+                            return;
+                          }
+                          if (status !== 0) {
+                            push("error", t("transfers.errors.cancelNotPending"));
+                            await refreshTransfers({ silent: true });
+                            return;
+                          }
+                        } catch (preErr) {
+                          // If transfer doesn't exist in this contract, inform and stop
+                          const msg = preErr instanceof Error ? preErr.message : String(preErr ?? "");
+                          if (msg.toLowerCase().includes("transfer not found")) {
+                            push("error", t("transfers.errors.notFound"));
+                            await refreshTransfers({ silent: true });
+                            return;
+                          }
+                          // Otherwise, continue to attempt and handle below
+                        }
+                        const result = await cancelTransfer(BigInt(row.id));
+                        setLastTxHash(result.txHash);
+                        setLastTxAction(`Transferencia #${row.id} cancelada`);
+                        push("success", t("transfers.success.cancelled"));
+                        await refreshTransfers();
+                        await refreshTokens({ silent: true });
+                      } catch (err: unknown) {
+                        // Detect missing function / outdated contract at address
+                        const raw = err instanceof Error ? err.message : String(err ?? "");
+                        const lower = raw.toLowerCase();
+                        const isOutdated = lower.includes("function selector") || lower.includes("selector was not recognized");
+                        if (lower.includes("transfer not found")) {
+                          push("error", t("transfers.errors.notFound"));
+                          await refreshTransfers({ silent: true });
+                          return;
+                        }
+                        if (isOutdated) {
+                          push("error", t("profile.toast.contractOutdated"));
+                        } else {
+                          const message = getErrorMessage(err, t("transfers.errors.operation"));
+                          if (message) push("error", message);
+                        }
+                      }
+                    }}
+                    disabled={!account}
+                  >
+                    {t("transfers.actions.cancel")}
+                  </button>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
       </section>
+      <TokenDetailModal
+        tokenId={modalTokenId}
+        onClose={() => setModalTokenId(null)}
+        fetchDetail={(id) => getTokenDetail(id, account)}
+      />
     </div>
   );
 }

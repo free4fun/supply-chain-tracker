@@ -21,7 +21,8 @@ contract SupplyChain {
     enum TransferStatus {
         Pending,
         Accepted,
-        Rejected
+        Rejected,
+        Cancelled
     }
 
     // ---------- Structs ----------
@@ -37,6 +38,11 @@ contract SupplyChain {
         string lastName;
     }
 
+    struct Component {
+        uint256 tokenId;
+        uint256 amount;
+    }
+
     struct Token {
         uint256 id;
         address creator;
@@ -46,6 +52,7 @@ contract SupplyChain {
         string features; // JSON blob
         uint256 parentId; // 0 = root
         uint256 dateCreated; // block.timestamp
+        uint256 availableSupply; // Tracks remaining units after transformations
         mapping(address => uint256) balance;
     }
 
@@ -69,7 +76,9 @@ contract SupplyChain {
 
     // Tokens
     uint256 public nextTokenId = 1;
-    mapping(uint256 => Token) public tokens;
+    // Mapping is internal; expose read-only views via getTokenView to avoid getter issues with mappings in structs
+    mapping(uint256 => Token) private tokens;
+    mapping(uint256 => Component[]) private tokenInputs; // tokenId => consumed components
 
     // Transfers
     uint256 public nextTransferId = 1;
@@ -100,6 +109,7 @@ contract SupplyChain {
         string features,
         uint256 parentId
     );
+    event TokenComponentsLinked(uint256 indexed tokenId, uint256[] componentIds, uint256[] componentAmounts);
     event TransferRequested(
         uint256 indexed transferId,
         address indexed from,
@@ -109,6 +119,7 @@ contract SupplyChain {
     );
     event TransferAccepted(uint256 indexed transferId);
     event TransferRejected(uint256 indexed transferId);
+    event TransferCancelled(uint256 indexed transferId);
 
     // ---------- Constructor ----------
     constructor() {
@@ -186,12 +197,28 @@ contract SupplyChain {
             uint256 totalSupply,
             string memory features,
             uint256 parentId,
-            uint256 dateCreated
+            uint256 dateCreated,
+            uint256 availableSupply
         )
     {
         _requireToken(tokenId);
         Token storage t = tokens[tokenId];
-        return (t.id, t.creator, t.name, t.description, t.totalSupply, t.features, t.parentId, t.dateCreated);
+        return (
+            t.id,
+            t.creator,
+            t.name,
+            t.description,
+            t.totalSupply,
+            t.features,
+            t.parentId,
+            t.dateCreated,
+            t.availableSupply
+        );
+    }
+
+    function getTokenInputs(uint256 tokenId) external view returns (Component[] memory) {
+        _requireToken(tokenId);
+        return tokenInputs[tokenId];
     }
 
     /// @notice Balance of an address for a given token.
@@ -371,7 +398,9 @@ contract SupplyChain {
         string memory name,
         string memory description,
         uint256 totalSupply,
-        string memory features
+        string memory features,
+        uint256[] memory inputIds,
+        uint256[] memory inputAmounts
     ) external {
         require(_isApproved(msg.sender), "Not approved");
         string memory role = _roleOf(msg.sender);
@@ -380,7 +409,16 @@ contract SupplyChain {
         require(bytes(name).length > 0, "Name required");
         require(totalSupply > 0, "Supply required");
 
-        uint256 parentId = _resolveParentId(role);
+        uint256 parentId = 0;
+        if (keccak256(bytes(role)) == keccak256("Producer")) {
+            require(inputIds.length == 0, "Root tokens use no inputs");
+        } else {
+            require(inputIds.length == inputAmounts.length, "Inputs mismatch");
+            require(inputIds.length > 0, "Inputs required");
+            // Parent ID is informational: we take the first component as the parent for traceability,
+            // but we do NOT enforce it to match any suggested value. Suggested parent is now a UI hint only.
+            parentId = inputIds[0];
+        }
 
         uint256 tokenId = nextTokenId++;
 
@@ -393,6 +431,7 @@ contract SupplyChain {
         t.features = features;
         t.parentId = parentId;
         t.dateCreated = block.timestamp;
+        t.availableSupply = totalSupply;
 
         t.balance[msg.sender] = totalSupply;
 
@@ -401,7 +440,35 @@ contract SupplyChain {
             userTokens[msg.sender].push(tokenId);
         }
 
+        if (inputIds.length > 0) {
+            for (uint256 i = 0; i < inputIds.length; i++) {
+                uint256 componentId = inputIds[i];
+                uint256 amount = inputAmounts[i];
+                require(amount > 0, "Component amount");
+                _requireToken(componentId);
+
+                Token storage component = tokens[componentId];
+                uint256 available = component.balance[msg.sender] - reservedPendingOut[componentId][msg.sender];
+                require(amount <= available, "Component exhausted");
+
+                component.balance[msg.sender] -= amount;
+                if (component.availableSupply >= amount) {
+                    component.availableSupply -= amount;
+                } else {
+                    component.availableSupply = 0;
+                }
+
+                tokenInputs[tokenId].push(Component({ tokenId: componentId, amount: amount }));
+            }
+
+            // After transformation the new asset becomes the suggested parent for the creator
+            suggestedParentByUser[msg.sender] = tokenId;
+        }
+
         emit TokenCreated(tokenId, msg.sender, name, description, totalSupply, features, parentId);
+        if (inputIds.length > 0) {
+            emit TokenComponentsLinked(tokenId, inputIds, inputAmounts);
+        }
     }
 
     // ---------- Transfers ----------
@@ -416,6 +483,9 @@ contract SupplyChain {
         require(_isValidRoute(msg.sender, to), "Invalid route");
 
         Token storage t = tokens[tokenId];
+
+    // Only the creator of the token can transfer it (not received tokens)
+    require(t.creator == msg.sender, "Only creator can transfer this token");
 
         // Available amount considering reservations
         uint256 available = t.balance[msg.sender] - reservedPendingOut[tokenId][msg.sender];
@@ -503,11 +573,105 @@ contract SupplyChain {
         emit TransferRejected(transferId);
     }
 
+    /// @notice Cancel a pending transfer. Only the sender can cancel and it must be Pending.
+    function cancelTransfer(uint256 transferId) external {
+        require(transferId != 0 && transferId < nextTransferId, "Transfer not found");
+        Transfer storage tr = transfers[transferId];
+        require(tr.status == TransferStatus.Pending, "Not pending");
+        require(msg.sender == tr.from, "Only sender");
+
+        // Release reservation
+        uint256 reserved = reservedPendingOut[tr.tokenId][tr.from];
+        if (reserved >= tr.amount) {
+            reservedPendingOut[tr.tokenId][tr.from] = reserved - tr.amount;
+        } else {
+            reservedPendingOut[tr.tokenId][tr.from] = 0; // defensive
+        }
+
+        tr.status = TransferStatus.Cancelled;
+        emit TransferCancelled(transferId);
+    }
+
     function getUserTokens(address user) external view returns (uint256[] memory) {
         return userTokens[user];
     }
 
     function getUserTransfers(address user) external view returns (uint256[] memory) {
         return userTransfers[user];
+    }
+
+    // ---------- Analytics (views) ----------
+    /// @notice Returns tokens created by the given user.
+    function getUserCreatedTokens(address user) external view returns (uint256[] memory) {
+        uint256 total = nextTokenId;
+        uint256 count = 0;
+        // First pass: count
+        for (uint256 i = 1; i < total; i++) {
+            if (tokens[i].creator == user) count++;
+        }
+        uint256[] memory ids = new uint256[](count);
+        if (count == 0) return ids;
+        uint256 idx = 0;
+        for (uint256 i = 1; i < total; i++) {
+            if (tokens[i].creator == user) {
+                ids[idx++] = i;
+            }
+        }
+        return ids;
+    }
+
+    /// @notice Returns a summary for tokens created by user: (createdCount, totalSupplySum, availableSum, totalConsumedInputs)
+    function getUserCreatedSummary(address user)
+        external
+        view
+        returns (
+            uint256 createdCount,
+            uint256 totalSupplySum,
+            uint256 availableSum,
+            uint256 totalConsumedInputs
+        )
+    {
+        uint256 total = nextTokenId;
+        for (uint256 i = 1; i < total; i++) {
+            Token storage t = tokens[i];
+            if (t.creator == user) {
+                createdCount++;
+                totalSupplySum += t.totalSupply;
+                availableSum += t.availableSupply;
+                // Sum inputs consumed to create token i
+                Component[] storage comps = tokenInputs[i];
+                for (uint256 k = 0; k < comps.length; k++) {
+                    totalConsumedInputs += comps[k].amount;
+                }
+            }
+        }
+        return (createdCount, totalSupplySum, availableSum, totalConsumedInputs);
+    }
+
+    /// @notice Returns ids with non-zero balance for a user and their balances.
+    function getUserBalancesNonZero(address user)
+        external
+        view
+        returns (uint256[] memory ids, uint256[] memory balances)
+    {
+        uint256[] storage all = userTokens[user];
+        uint256 count = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            uint256 id = all[i];
+            if (tokens[id].balance[user] > 0) count++;
+        }
+        ids = new uint256[](count);
+        balances = new uint256[](count);
+        if (count == 0) return (ids, balances);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            uint256 id = all[i];
+            uint256 bal = tokens[id].balance[user];
+            if (bal > 0) {
+                ids[idx] = id;
+                balances[idx] = bal;
+                idx++;
+            }
+        }
     }
 }

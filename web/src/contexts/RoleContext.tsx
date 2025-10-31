@@ -82,6 +82,10 @@ function emptySnapshot(isAdmin: boolean): Snapshot {
     isRegistered: false,
     isApproved: false,
     activeRole: undefined,
+    pendingRole: undefined,
+    company: undefined,
+    firstName: undefined,
+    lastName: undefined,
     lastRequestedRole: undefined,
     lastRequestedAt: undefined,
     isAdmin,
@@ -199,12 +203,17 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubs: Array<() => void> = [];
 
-    refresh();
-
-    if (!account)
+    // Limpiar inmediatamente si no hay cuenta
+    if (!account) {
+      setSnapshot(emptySnapshot(false));
+      setLoading(false);
       return () => {
         unsubs.forEach(fn => fn());
       };
+    }
+
+    // Si hay cuenta, hacer refresh
+    refresh();
 
     (async () => {
       try {

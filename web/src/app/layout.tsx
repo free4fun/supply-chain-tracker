@@ -6,19 +6,23 @@ import { RoleProvider } from "@/contexts/RoleContext";
 import { I18nProvider } from "@/contexts/I18nContext";
 import ChainGuard from "@/components/ChainGuard";
 import ConnectBanner from "@/components/ConnectBanner";
+import ThemeController from "@/components/ThemeController";
+import RedeployBanner from "@/components/RedeployBanner";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body>       
         <I18nProvider>
           <Web3Provider>
             <ToastProvider>
               <RoleProvider>
+                <ThemeController />
                 <ChainGuard>
-                  <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+                  <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
                     <Nav />
                     <ConnectBanner />
+                    <RedeployBanner />
                     <main className="w-full">{children}</main>
                   </div>
                 </ChainGuard>

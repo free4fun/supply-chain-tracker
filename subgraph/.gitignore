@@ -1,0 +1,24 @@
+# Graph data and build outputs
+data/
+node_modules/
+generated/
+build/
+.graph/
+
+# OS files
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Temporary files
+*.tmp
+.cache/

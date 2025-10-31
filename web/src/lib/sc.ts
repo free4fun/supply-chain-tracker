@@ -4,6 +4,9 @@
 import { getContract } from "@/lib/web3";
 import type { Provider, EventLog } from "ethers";
 
+// Force view calls to use the latest block tag to avoid BlockOutOfRange errors after chain resets/redeploys
+const CALL_OPTS = { blockTag: "latest" as any };
+
 export type UserView = {
   id: number;
   addr: string;
@@ -18,124 +21,228 @@ export type RoleReq = { user: string; role: string; blockNumber: number; txHash:
 
 export async function scAdmin(): Promise<string> {
   const sc = await getContract(false);
-  return sc.admin();
+  return sc.admin(CALL_OPTS);
 }
 
 export async function getUserInfo(addr: string) {
   const sc = await getContract(false);
-  return sc.getUserInfo(addr);
+  return sc.getUserInfo(addr, CALL_OPTS);
 }
 
-export async function requestUserRole(role: string): Promise<void> {
+export async function requestUserRole(role: string): Promise<{ txHash: string }> {
   if (!role) throw new Error("Role required");
   const sc = await getContract(true);
   const tx = await sc.requestUserRole(role);
   await tx.wait();
+  return { txHash: tx.hash };
 }
 
-export async function registerAndRequestRole(company: string, firstName: string, lastName: string, role: string): Promise<void> {
+export async function registerAndRequestRole(company: string, firstName: string, lastName: string, role: string): Promise<{ txHash: string }> {
   if (!company || !firstName || !lastName) throw new Error("Profile required");
   if (!role) throw new Error("Role required");
   const sc = await getContract(true);
   const tx = await sc.registerAndRequestRole(company, firstName, lastName, role);
   await tx.wait();
+  return { txHash: tx.hash };
 }
 
-export async function changeStatusUser(addr: string, newStatus: number): Promise<void> {
+export async function changeStatusUser(addr: string, newStatus: number): Promise<{ txHash: string }> {
   const sc = await getContract(true);
   const tx = await sc.changeStatusUser(addr, newStatus);
   await tx.wait();
+  return { txHash: tx.hash };
 }
 
-export async function cancelRoleRequest(): Promise<void> {
+export async function cancelRoleRequest(): Promise<{ txHash: string }> {
   const sc = await getContract(true);
   const tx = await sc.cancelRoleRequest();
   await tx.wait();
+  return { txHash: tx.hash };
 }
 
-export async function updateUserProfile(company: string, firstName: string, lastName: string): Promise<void> {
+export async function updateUserProfile(company: string, firstName: string, lastName: string): Promise<{ txHash: string }> {
   if (!company || !firstName || !lastName) throw new Error("Profile required");
   const sc = await getContract(true);
   const tx = await sc.updateUserProfile(company, firstName, lastName);
   await tx.wait();
+  return { txHash: tx.hash };
 }
+
+export type ComponentInput = { tokenId: bigint; amount: bigint };
 
 export async function createToken(
   name: string,
   description: string,
   totalSupply: bigint,
-  features: string
-): Promise<void> {
+  features: string,
+  components: ComponentInput[]
+): Promise<{ txHash: string; tokenId: number }> {
   if (!name) throw new Error("Name required");
   if (totalSupply <= BigInt(0)) throw new Error("Supply must be > 0"); // <- sin 0n
   const sc = await getContract(true);
-  const tx = await sc.createToken(name, description, totalSupply, features);
-  await tx.wait();
+  const ids = components.map(component => component.tokenId);
+  const amounts = components.map(component => component.amount);
+  const tx = await sc.createToken(name, description, totalSupply, features, ids, amounts);
+  const receipt = await tx.wait();
+  
+  // Extract tokenId from TokenCreated event
+  const tokenCreatedEvent = receipt?.logs?.find((log: any) => {
+    try {
+      const parsed = sc.interface.parseLog(log);
+      return parsed?.name === "TokenCreated";
+    } catch {
+      return false;
+    }
+  });
+  
+  let tokenId = 0;
+  if (tokenCreatedEvent) {
+    try {
+      const parsed = sc.interface.parseLog(tokenCreatedEvent);
+      tokenId = Number(parsed?.args?.[0] ?? 0);
+    } catch {}
+  }
+  
+  return { txHash: tx.hash, tokenId };
 }
 
 export async function getTokenView(id: number) {
   const sc = await getContract(false);
-  return sc.getTokenView(id);
+  return sc.getTokenView(id, CALL_OPTS);
+}
+
+export type TokenComponent = { tokenId: number; amount: bigint };
+
+export async function getTokenInputs(tokenId: number): Promise<TokenComponent[]> {
+  const sc = await getContract(false);
+  const raw = await sc.getTokenInputs(tokenId, CALL_OPTS);
+  return raw.map((entry: any) => ({
+    tokenId: Number(entry.tokenId ?? entry[0]),
+    amount: BigInt(entry.amount ?? entry[1]),
+  }));
 }
 
 export async function nextTokenId(): Promise<number> {
   const sc = await getContract(false);
-  const n: bigint = await sc.nextTokenId();
+  const n: bigint = await sc.nextTokenId(CALL_OPTS);
   return Number(n);
 }
 
 export async function getSuggestedParent(addr: string) {
   const sc = await getContract(false);
-  return sc.getSuggestedParent(addr);
+  return sc.getSuggestedParent(addr, CALL_OPTS);
 }
 
-export async function transfer(to: string, tokenId: bigint, amount: bigint) {
+export async function transfer(to: string, tokenId: bigint, amount: bigint): Promise<{ txHash: string; transferId?: number }> {
   const sc = await getContract(true);
   const tx = await sc.transfer(to, tokenId, amount);
-  await tx.wait();
+  const receipt = await tx.wait();
+  
+  // Extract transferId from TransferCreated event
+  const transferCreatedEvent = receipt?.logs?.find((log: any) => {
+    try {
+      const parsed = sc.interface.parseLog(log);
+      return parsed?.name === "TransferCreated";
+    } catch {
+      return false;
+    }
+  });
+  
+  let transferId: number | undefined;
+  if (transferCreatedEvent) {
+    try {
+      const parsed = sc.interface.parseLog(transferCreatedEvent);
+      transferId = Number(parsed?.args?.[0] ?? 0);
+    } catch {}
+  }
+  
+  return { txHash: tx.hash, transferId };
 }
 
-export async function acceptTransfer(id: bigint) {
+export async function acceptTransfer(id: bigint): Promise<{ txHash: string }> {
   const sc = await getContract(true);
   const tx = await sc.acceptTransfer(id);
   await tx.wait();
+  return { txHash: tx.hash };
 }
 
-export async function rejectTransfer(id: bigint) {
+export async function rejectTransfer(id: bigint): Promise<{ txHash: string }> {
   const sc = await getContract(true);
   const tx = await sc.rejectTransfer(id);
   await tx.wait();
+  return { txHash: tx.hash };
+}
+
+export async function cancelTransfer(id: bigint): Promise<{ txHash: string }> {
+  const sc = await getContract(true);
+  const tx = await sc.cancelTransfer(id);
+  await tx.wait();
+  return { txHash: tx.hash };
 }
 
 export async function getTransfer(id: number) {
   const sc = await getContract(false);
-  return sc.getTransfer(id);
+  return sc.getTransfer(id, CALL_OPTS);
 }
 
 export async function getUserTokens(addr: string) {
   const sc = await getContract(false);
-  return sc.getUserTokens(addr);
+  return sc.getUserTokens(addr, CALL_OPTS);
 }
 
 export async function getUserTransfers(addr: string) {
   const sc = await getContract(false);
-  return sc.getUserTransfers(addr);
+  return sc.getUserTransfers(addr, CALL_OPTS);
 }
 
 export async function getTokenBalance(tokenId: number, addr: string) {
   const sc = await getContract(false);
-  return sc.getTokenBalance(tokenId, addr);
+  return sc.getTokenBalance(tokenId, addr, CALL_OPTS);
+}
+
+export async function getUserCreatedTokens(addr: string): Promise<number[]> {
+  const sc = await getContract(false);
+  const ids: bigint[] = await sc.getUserCreatedTokens(addr, CALL_OPTS);
+  return ids.map(n => Number(n));
+}
+
+export type CreatedSummary = {
+  createdCount: number;
+  totalSupplySum: bigint;
+  availableSum: bigint;
+  totalConsumedInputs: bigint;
+};
+
+export async function getUserCreatedSummary(addr: string): Promise<CreatedSummary> {
+  const sc = await getContract(false);
+  const res = await sc.getUserCreatedSummary(addr, CALL_OPTS);
+  // Expect tuple [createdCount, totalSupplySum, availableSum, totalConsumedInputs]
+  return {
+    createdCount: Number(res[0]),
+    totalSupplySum: BigInt(res[1]),
+    availableSum: BigInt(res[2]),
+    totalConsumedInputs: BigInt(res[3]),
+  };
+}
+
+export async function getUserBalancesNonZero(addr: string): Promise<{ ids: number[]; balances: bigint[] }> {
+  const sc = await getContract(false);
+  const [idsRaw, balancesRaw]: [bigint[], bigint[]] = await sc.getUserBalancesNonZero(addr, CALL_OPTS);
+  return {
+    ids: idsRaw.map(Number),
+    balances: balancesRaw.map(BigInt),
+  };
 }
 
 export async function nextUserId(): Promise<number> {
   const sc = await getContract(false);
-  const n: bigint = await sc.nextUserId();
+  const n: bigint = await sc.nextUserId(CALL_OPTS);
   return Number(n);
 }
 
 export async function getUserById(id: number): Promise<UserView> {
   const sc = await getContract(false);
-  const u = await sc.users(id);
+  const u = await sc.users(id, CALL_OPTS);
   // users mapping returns: [id, userAddress, role, pendingRole, status]
   return {
     id: Number(u[0]),
@@ -150,7 +257,6 @@ export async function getUserById(id: number): Promise<UserView> {
 }
 
 export async function listUsers(): Promise<UserView[]> {
-  const sc = await getContract(false);
   const n = await nextUserId();
   const out: UserView[] = [];
   for (let i = 1; i < n; i++) {
