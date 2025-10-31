@@ -67,6 +67,26 @@ contract Seed is Script {
         return string(abi.encodePacked(ch));
     }
 
+    /// @dev Simple uint to string conversion to avoid vm.toString() ambiguity
+    function _uint2str(uint256 value) internal pure returns (string memory) {
+        if (value == 0) {
+            return "0";
+        }
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
+    }
+
     /// @dev Cannot be view because vm.envString/deriveKey are not view in forge-std
     function _derive(uint32 index) internal returns (uint256 pk, address addr) {
         // Read secrets from environment; MNEMONIC is required
@@ -131,18 +151,45 @@ contract Seed is Script {
             console2.log("  Consumer:", consumer);
 
             // Register + approve with varied realistic data
-            string[8] memory producerNames = ["Valle Verde S.A.", "Finca Los Andes", "Agropecuaria del Sur", "Vinas Patagonicas", "Cosecha Natural", "Campo Dorado", "Tierras Altas", "Granja Organica"];
-            string[8] memory producerFirstNames = ["Maria", "Carlos", "Sofia", "Diego", "Ana", "Roberto", "Laura", "Fernando"];
-            string[8] memory producerLastNames = ["Rodriguez", "Fernandez", "Lopez", "Garcia", "Martinez", "Sanchez", "Diaz", "Torres"];
+            string[8] memory producerNames = [
+                "Vinedo Valle de Uco S.A.",
+                "Finca Los Aromos",
+                "Bodega Familiar Zunino",
+                "Vinedos Patagonicos",
+                "Finca La Consulta",
+                "Vinedo Alto Agrelo",
+                "Vinedos del Valle de Pedernal",
+                "Finca Altamira"
+            ];
+            string[8] memory producerFirstNames = ["Maria Soledad", "Carlos Alberto", "Sofia Elena", "Diego Martin", "Ana Victoria", "Roberto Javier", "Laura Beatriz", "Fernando Gabriel"];
+            string[8] memory producerLastNames = ["Rodriguez Paz", "Fernandez Silva", "Lopez Martinez", "Garcia Ruiz", "Martinez Soto", "Sanchez Diaz", "Diaz Moreno", "Torres Castro"];
             
-            string[8] memory factoryNames = ["Bodega Los Andes", "Vinos del Valle", "Bodega Austral", "Vinificadora Patagonica", "Cava Artesanal", "Bodega Organica", "Vinos Selectos", "Bodega Regional"];
-            string[8] memory factoryFirstNames = ["Juan", "Patricia", "Miguel", "Valeria", "Ricardo", "Gabriela", "Alejandro", "Claudia"];
+            string[8] memory factoryNames = [
+                "Bodega Catena Zapata",
+                "Bodega Norton",
+                "Bodega Trapiche",
+                "Bodega Luigi Bosca",
+                "Bodega Zuccardi",
+                "Bodega Ruca Malen",
+                "Bodega Altos Las Hormigas",
+                "Bodega Salentein"
+            ];
+            string[8] memory factoryFirstNames = ["Juan Pablo", "Patricia Soledad", "Miguel Angel", "Valeria Fernanda", "Ricardo Jose", "Gabriela Ines", "Alejandro Luis", "Claudia Marcela"];
             
-            string[8] memory retailerNames = ["Vinoteca Ciudad", "Comercio de Vinos", "Tienda Gourmet", "Distribuidor Premium", "Almacen de Vinos", "Bodega Retail", "Vinos y Licores", "Comercial Selecta"];
-            string[8] memory retailerFirstNames = ["Pedro", "Carolina", "Luis", "Monica", "Sergio", "Andrea", "Daniel", "Beatriz"];
+            string[8] memory retailerNames = [
+                "Vinoteca El Buen Vino",
+                "Wines & More Argentina",
+                "La Casa del Vino",
+                "Premium Wine Selection",
+                "Vinoteca del Centro",
+                "Distribuidor Vinos Selectos",
+                "Comercial Vitivinicola Sur",
+                "Grand Cru Importaciones"
+            ];
+            string[8] memory retailerFirstNames = ["Pedro Ignacio", "Carolina Andrea", "Luis Fernando", "Monica Alejandra", "Sergio Daniel", "Andrea Susana", "Daniel Eduardo", "Beatriz Cristina"];
             
-            string[8] memory consumerFirstNames = ["Jorge", "Silvia", "Pablo", "Marcela", "Martin", "Veronica", "Gustavo", "Adriana"];
-            string[8] memory consumerLastNames = ["Alvarez", "Ramirez", "Castro", "Morales", "Herrera", "Nunez", "Silva", "Vargas"];
+            string[8] memory consumerFirstNames = ["Jorge Luis", "Silvia Beatriz", "Pablo Andres", "Marcela Viviana", "Martin Ezequiel", "Veronica Paola", "Gustavo Raul", "Adriana Isabel"];
+            string[8] memory consumerLastNames = ["Alvarez Perez", "Ramirez Gomez", "Castro Herrera", "Morales Nunez", "Herrera Vargas", "Nunez Acosta", "Silva Mendez", "Vargas Flores"];
             
             producer = _register(sc, base,     "Producer", producerNames[i % 8], producerFirstNames[i % 8], producerLastNames[i % 8]);
             factory  = _register(sc, base + 1, "Factory",  factoryNames[i % 8], factoryFirstNames[i % 8], producerLastNames[(i+1) % 8]);
@@ -154,45 +201,60 @@ contract Seed is Script {
             uint256[] memory frShip = _shipments(FR_TOTAL, TRANSFERS_PER_STAGE);
             uint256[] memory rcShip = _shipments(RC_TOTAL, TRANSFERS_PER_STAGE);
 
-            // Product variety data
-            string[6] memory varieties = ["Malbec", "Cabernet", "Merlot", "Chardonnay", "Torrontes", "Syrah"];
-            string[6] memory origins = ["Mendoza", "Patagonia", "San Juan", "Salta", "La Rioja", "Neuquen"];
-            string[4] memory months = ["08", "09", "10", "11"];
+            // Product variety data - Cepas y regiones argentinas
+            string[8] memory varieties = ["Malbec", "Cabernet Sauvignon", "Merlot", "Chardonnay", "Torrontes", "Syrah", "Bonarda", "Pinot Noir"];
+            string[8] memory regions = ["VUC", "LUC", "MAP", "CAF", "PAT", "PED", "TUP", "NEU"];  // Codigos de region
+            string[8] memory origins = ["Valle de Uco, Mendoza", "Lujan de Cuyo, Mendoza", "Maipu, Mendoza", "Cafayate, Salta", "Patagonia, Rio Negro", "Valle de Pedernal, San Juan", "Tupungato, Mendoza", "Neuquen"];
+            string[8] memory parcels = ["Cuadro 5 Norte", "Parcela A-12", "Lote 7 Sur", "Seccion B-8", "Cuadro 3 Este", "Parcela C-15", "Lote 9 Oeste", "Seccion D-4"];
+            string[8] memory soilTypes = ["Franco arenoso aluvial", "Arcillo-limoso", "Pedregoso calcareo", "Franco arcilloso", "Arenoso con grava", "Limoso profundo", "Arcilloso ferrico", "Franco limoso"];
+            string[4] memory months = ["02", "03", "04", "05"];  // Vendimia Argentina: Feb-Mayo
+            uint16[4] memory altitudes = [950, 1100, 1250, 1400];  // Metros sobre el nivel del mar
             bool[2] memory organic = [true, false];
             
             for (uint256 j = 0; j < LOTS_PER_CHAIN; j++) {
                 // Producer creates root token with varied realistic attributes
                 (uint256 pkProd, ) = _derive(base);
-                uint256 varietyIdx = (i * LOTS_PER_CHAIN + j) % 6;
+                uint256 varietyIdx = (i * LOTS_PER_CHAIN + j) % 8;
+                uint256 regionIdx = varietyIdx;
                 uint256 monthIdx = (i + j) % 4;
+                uint256 altIdx = (i + j) % 4;
                 bool isOrganic = organic[(i + j) % 2];
                 
                 string memory lotCode = string.concat(
-                    _letter(varietyIdx), 
-                    "-2025-",
-                    months[monthIdx],
+                    "UVA-",
+                    regions[regionIdx],
                     "-",
+                    _letter(varietyIdx),
+                    _uint2str(altitudes[altIdx]),
+                    "-",
+                    _letter(i),
                     _letter(j)
                 );
                 
                 vm.startBroadcast(pkProd);
                 sc.createToken(
-                    string.concat("Uvas ", varieties[varietyIdx], " Lote ", lotCode),
+                    string.concat("Lote Uvas ", varieties[varietyIdx], " ", lotCode),
                     string.concat(
-                        isOrganic ? "Uvas organicas certificadas" : "Uvas de cultivo convencional",
-                        ", cosecha 2025-",
+                        isOrganic ? "Uvas organicas certificadas SENASA " : "Uvas de vina tradicional ",
+                        "cosechadas manualmente en vendimia 2025-",
                         months[monthIdx],
-                        ", region ",
-                        origins[varietyIdx % 6]
+                        ". Origen: ",
+                        origins[varietyIdx],
+                        ". Parcela: ",
+                        parcels[varietyIdx],
+                        "."
                     ),
                     ROOT_SUPPLY,
                     string.concat(
-                        "{\"variety\":\"", varieties[varietyIdx], 
-                        "\",\"origin\":\"", origins[varietyIdx % 6],
-                        "\",\"harvest\":\"2025-", months[monthIdx],
+                        "{\"grapeVariety\":\"", varieties[varietyIdx],
+                        "\",\"harvestDate\":\"2025-03-", (j < 5) ? "15" : "28",
+                        "\",\"parcel\":\"", parcels[varietyIdx],
+                        "\",\"weightKg\":", _uint2str(ROOT_SUPPLY),
+                        ",\"vineyardAltitude\":", _uint2str(altitudes[altIdx]),
+                        ",\"soil\":\"", soilTypes[altIdx],
                         "\",\"organic\":", isOrganic ? "true" : "false",
-                        ",\"lot\":\"", lotCode,
-                        "\",\"certification\":\"", isOrganic ? "SENASA-ORG-2025" : "SENASA-STD-2025",
+                        ",\"certification\":\"", isOrganic ? "SENASA-ORG-2025-" : "SENASA-STD-2025-", _uint2str(i*100+j),
+                        "\",\"brixGrades\":\"23.5\",\"phLevel\":\"3.4\",\"region\":\"", origins[varietyIdx],
                         "\"}"
                     ),
                     new uint256[](0),
@@ -225,19 +287,49 @@ contract Seed is Script {
                 }
 
                 // Factory creates derived token from accepted components
-                string[4] memory processes = ["fermentacion-barrica", "fermentacion-tanque", "macerado-frio", "crianza-roble"];
-                string[4] memory batchPrefixes = ["VI", "RE", "CR", "GR"];
+                string[8] memory wineNames = [
+                    "Reserva de Altura",
+                    "Gran Reserva",
+                    "Single Vineyard",
+                    "Estate Reserve",
+                    "Clasico",
+                    "Premium Selection",
+                    "Terroir",
+                    "Limited Edition"
+                ];
+                string[8] memory processes = [
+                    "Fermentacion en barrica francesa",
+                    "Fermentacion en tanque de acero inoxidable",
+                    "Macerado en frio pre-fermentativo",
+                    "Crianza 12 meses en roble americano",
+                    "Fermentacion con levaduras autoctonas",
+                    "Crianza 18 meses en roble frances",
+                    "Fermentacion malolactica en barrica",
+                    "Crianza sur lies 6 meses"
+                ];
+                string[8] memory alcoholGrades = ["13.5", "14.0", "13.8", "14.5", "13.2", "14.2", "13.7", "14.8"];
+                string[8] memory tastingNotes = [
+                    "Notas a frutos rojos maduros, taninos sedosos, final largo y persistente",
+                    "Aromas a ciruela y especias, cuerpo medio, taninos firmes",
+                    "Frutas negras, vainilla, chocolate, estructura compleja",
+                    "Cerezas, violetas, taninos suaves, muy equilibrado",
+                    "Fresco y frutal, notas florales, taninos jovenes",
+                    "Concentrado, frutos negros, roble tostado, elegante",
+                    "Mineral, frutas oscuras, taninos integrados",
+                    "Intenso, mermelada de frutos del bosque, especiado"
+                ];
                 
                 uint256 consumeFactory = _min(FACTORY_CONSUME, acceptedToFactory);
                 if (consumeFactory > 0) {
                     (uint256 pkFac2,) = _derive(base + 1);
-                    uint256 processIdx = (i + j) % 4;
+                    uint256 processIdx = (i + j) % 8;
                     string memory batchCode = string.concat(
-                        batchPrefixes[processIdx],
+                        "VN-",
+                        _uint2str(2025),
                         "-",
                         _letter(varietyIdx),
                         "-",
-                        months[monthIdx]
+                        _uint2str((i*1000 + j*10 + processIdx))
                     );
                     
                     vm.startBroadcast(pkFac2);
@@ -245,19 +337,27 @@ contract Seed is Script {
                     uint256[] memory amts = new uint256[](1);
                     ids[0] = tokenRoot; amts[0] = consumeFactory;
                     sc.createToken(
-                        string.concat("Vino ", varieties[varietyIdx], " ", batchCode),
+                        string.concat("Vino ", varieties[varietyIdx], " ", wineNames[processIdx], " ", batchCode),
                         string.concat(
-                            "Vino elaborado por ",
+                            "Vino elaborado mediante ",
                             processes[processIdx],
-                            ", lote ",
+                            ". Batch: ",
                             batchCode,
-                            ", cosecha 2025"
+                            ". Cosecha 2025. Alcohol: ",
+                            alcoholGrades[processIdx],
+                            "%vol"
                         ),
                         consumeFactory,
                         string.concat(
-                            "{\"type\":\"wine\",\"process\":\"", processes[processIdx],
+                            "{\"wineName\":\"", varieties[varietyIdx], " ", wineNames[processIdx],
+                            "\",\"vintage\":\"2025",
+                            "\",\"alcohol\":\"", alcoholGrades[processIdx],
+                            "\",\"fermentation\":\"", processes[processIdx],
+                            "\",\"agingMonths\":\"", processIdx < 4 ? "6" : "12",
+                            "\",\"tastingNotes\":\"", tastingNotes[processIdx],
                             "\",\"batch\":\"", batchCode,
-                            "\",\"alcohol\":\"13.5\",\"vintage\":\"2025\",\"aging\":\"6-months\"}"
+                            "\",\"bottlingDate\":\"2025-", months[(monthIdx+6)%4], "-01",
+                            "\",\"sulphites\":\"Contains sulphites\",\"temperature\":\"16-18C\"}"
                         ),
                         ids, amts
                     );
@@ -283,12 +383,43 @@ contract Seed is Script {
                 }
 
                 // Retailer creates packaged product from received
-                string[4] memory packages = ["6x750ml", "12x750ml", "3x1.5L", "1x3L"];
-                string[4] memory labels = ["Reserva", "Gran Reserva", "Premium", "Seleccion Especial"];
+                string[8] memory packages = ["Caja 6x750ml", "Caja 12x750ml", "Pack 3x1.5L Magnum", "Caja 1x3L Doble Magnum", "Estuche Premium 2x750ml", "Caja 6x375ml", "Gift Box 1x750ml", "Pack 4x187ml"];
+                string[8] memory labels = [
+                    "Reserva Especial",
+                    "Gran Reserva",
+                    "Linea Premium",
+                    "Seleccion del Enologo",
+                    "Edicion Limitada",
+                    "Terroir Selection",
+                    "Estate Collection",
+                    "Icon Series"
+                ];
+                string[8] memory markets = [
+                    "Exportacion - Estados Unidos",
+                    "Mercado interno - Premium",
+                    "Exportacion - Europa",
+                    "Gastronomia - Alta gama",
+                    "Eventos corporativos",
+                    "Exportacion - Asia",
+                    "Mercado interno - Delicatessen",
+                    "Wine clubs exclusivos"
+                ];
+                string[8] memory pairings = [
+                    "Carnes rojas a la parrilla, cordero patagonico",
+                    "Pastas con salsas intensas, risottos",
+                    "Quesos maduros, embutidos artesanales",
+                    "Caza mayor, estofados",
+                    "Pescados grasos, mariscos",
+                    "Aves de corral, cerdo",
+                    "Platos especiados, curry",
+                    "Postres con chocolate, frutos secos"
+                ];
+                
                 uint256 consumeRetail = _min(RETAIL_CONSUME, acceptedToRetail);
                 if (consumeRetail > 0) {
                     (uint256 pkRet2,) = _derive(base + 2);
-                    uint256 pkgIdx = (i + j) % 4;
+                    uint256 pkgIdx = (i + j) % 8;
+                    string memory ean = string.concat("779", _uint2str(1000000 + (i*10000 + j*100 + pkgIdx)));
                     
                     vm.startBroadcast(pkRet2);
                     uint256[] memory ids2 = new uint256[](1);
@@ -296,19 +427,28 @@ contract Seed is Script {
                     ids2[0] = tokenFactory; amts2[0] = consumeRetail;
                     sc.createToken(
                         string.concat(
-                            "Vino ", varieties[varietyIdx], " Embotellado ",
-                            labels[pkgIdx]
+                            varieties[varietyIdx], " ",
+                            labels[pkgIdx], " ",
+                            packages[pkgIdx]
                         ),
                         string.concat(
-                            "Pack ", packages[pkgIdx], " etiqueta ",
-                            labels[pkgIdx], ", listo para distribucion, cosecha 2025"
+                            "Vino embotellado y etiquetado. ",
+                            packages[pkgIdx], " - ",
+                            labels[pkgIdx],
+                            ". Listo para distribucion. Cosecha 2025. Destino: ",
+                            markets[pkgIdx]
                         ),
                         consumeRetail,
                         string.concat(
-                            "{\"package\":\"", packages[pkgIdx],
-                            "\",\"label\":\"", labels[pkgIdx],
-                            "\",\"barcode\":\"779", _letter(varietyIdx), _letter(pkgIdx),
-                            "\",\"vintage\":\"2025\",\"appellation\":\"D.O.C.\"}"
+                            "{\"packName\":\"", labels[pkgIdx],
+                            "\",\"packagingDate\":\"2025-", months[(monthIdx+8)%4], "-15",
+                            "\",\"bottleCount\":\"", pkgIdx < 2 ? (pkgIdx == 0 ? "6" : "12") : (pkgIdx == 2 ? "3" : "1"),
+                            "\",\"pairing\":\"", pairings[pkgIdx],
+                            "\",\"market\":\"", markets[pkgIdx],
+                            "\",\"shelfLifeMonths\":\"36",
+                            "\",\"barcode\":\"", ean,
+                            "\",\"appellation\":\"D.O.C. Mendoza\",\"importer\":\"", pkgIdx % 2 == 0 ? "Wine Importers LLC" : "N/A",
+                            "\"}"
                         ),
                         ids2, amts2
                     );

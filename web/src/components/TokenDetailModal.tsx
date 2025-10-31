@@ -430,7 +430,7 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
                     {Object.entries(knownMetadata).map(([key, value]) => (
                       <div key={key} className="rounded-2xl border border-surface bg-surface-2 p-4 cursor-default">
                         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{formatKey(key)}</p>
-                        <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">{formatValue(value)}</p>
+                        <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">{formatValue(value, locale)}</p>
                       </div>
                     ))}
                   </div>
