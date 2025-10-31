@@ -1,4 +1,5 @@
 "use client";
+import { handleBlockOutOfRange } from "@/lib/blockOutOfRange";
 import { useEffect, useMemo, useState } from "react";
 import { changeStatusUser } from "@/lib/sc";
 import { listUsers, lastRoleRequestByUser, type UserView } from "@/lib/sc";
@@ -24,12 +25,15 @@ export default function AdminUsersPage() {
     async function load() {
         setLoading(true);
         try {
-        const [users, lastReqIdx] = await Promise.all([listUsers(), lastRoleRequestByUser()]);
-        const merged: Row[] = users.map(u => {
-            const req = lastReqIdx[u.addr.toLowerCase()];
-            return { ...u, lastRole: req?.role, lastAt: req?.timestamp };
-        });
-        setRows(merged.sort((a,b) => (b.lastAt||0)-(a.lastAt||0)));
+                const [users, lastReqIdx] = await Promise.all([
+                    listUsers().catch((err) => { if (!handleBlockOutOfRange(err)) throw err; return []; }),
+                    lastRoleRequestByUser().catch((err) => { if (!handleBlockOutOfRange(err)) throw err; return {}; })
+                ]);
+                const merged: Row[] = (users as UserView[]).map((u: UserView) => {
+                        const req = (lastReqIdx as Record<string, any>)[u.addr.toLowerCase()];
+                        return { ...u, lastRole: req?.role, lastAt: req?.timestamp };
+                });
+                setRows(merged.sort((a,b) => (b.lastAt||0)-(a.lastAt||0)));
         } catch (e:any) { push("error", e?.message || t("admin.users.loadFailed")); }
         finally { setLoading(false); }
     }
@@ -66,7 +70,7 @@ export default function AdminUsersPage() {
 
     async function act(addr: string, s: number) {
         try {
-            await changeStatusUser(addr, s);
+            await changeStatusUser(addr, s).catch((err) => { if (!handleBlockOutOfRange(err)) throw err; });
             push("success", t("admin.users.statusUpdated", { status: t(`admin.users.status.${STATUS_KEYS[s as 0|1|2|3]}`) }));
             await load();
         } catch (e:any) { 
@@ -121,12 +125,29 @@ export default function AdminUsersPage() {
                             </>
                         ) : <span className="text-gray-400">-</span>}
                     </div>
-                    <div className="col-span-2 space-y-1">
+                                        <div className="col-span-2 space-y-1">
                         <div className="font-medium text-slate-500 dark:text-slate-400 text-xs">{t("admin.users.headers.actions")}</div>
-                        <div className="flex flex-wrap gap-1">
-                            <button className="px-2 py-1 rounded border text-xs" onClick={()=>act(r.addr, 1)} disabled={r.status!==0}>{t("admin.users.actions.approve")}</button>
-                            <button className="px-2 py-1 rounded border text-xs" onClick={()=>act(r.addr, 2)} disabled={r.status!==0}>{t("admin.users.actions.reject")}</button>
-                        </div>
+                                                {(() => {
+                                                    const hasPendingRole = Boolean(r.pendingRole && r.pendingRole.length > 0);
+                                                    const canAct = r.status === 0 || hasPendingRole; // Pending status OR approved with pendingRole
+                                                    if (!canAct) return <div className="text-xs text-slate-400">—</div>;
+                                                    return (
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <button
+                                                                className="px-3 py-1 rounded border text-xs font-semibold border-emerald-400 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300"
+                                                                onClick={() => act(r.addr, 1)}
+                                                            >
+                                                                {t("admin.users.actions.approve")}
+                                                            </button>
+                                                            <button
+                                                                className="px-3 py-1 rounded border text-xs font-semibold border-rose-400 text-rose-700 hover:bg-rose-50 dark:text-rose-300"
+                                                                onClick={() => act(r.addr, 2)}
+                                                            >
+                                                                {t("admin.users.actions.reject")}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })()}
                     </div>
                 </div>
                 {(r.company || r.firstName || r.lastName) ? (

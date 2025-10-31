@@ -9,6 +9,7 @@ import { useRole } from "@/contexts/RoleContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { useRoleTheme } from "@/hooks/useRoleTheme";
 import { getErrorMessage } from "@/lib/errors";
+import { handleBlockOutOfRange } from "@/lib/blockOutOfRange";
 
 const ROLES = ["Producer", "Factory", "Retailer", "Consumer"] as const;
 const schema = z.object({ role: z.enum(ROLES) });
@@ -93,12 +94,14 @@ export default function ProfilePage() {
       push(ToastKind.Success, t("profile.toast.success"));
       await refresh();
     } catch (err: unknown) {
-      let message = getErrorMessage(err, t("profile.toast.failure"));
-      if (message) {
-        if (message.includes("CALL_EXCEPTION") || message.includes("execution reverted")) {
-          message = t("profile.toast.contractOutdated");
+      if (!handleBlockOutOfRange(err)) {
+        let message = getErrorMessage(err, t("profile.toast.failure"));
+        if (message) {
+          if (message.includes("CALL_EXCEPTION") || message.includes("execution reverted")) {
+            message = t("profile.toast.contractOutdated");
+          }
+          push(ToastKind.Error, message);
         }
-        push(ToastKind.Error, message);
       }
     } finally {
       setPending(false);
@@ -124,12 +127,14 @@ export default function ProfilePage() {
       push(ToastKind.Success, t("profile.profile.saved"));
       await refresh();
     } catch (err: unknown) {
-      let message = getErrorMessage(err, t("profile.toast.failure"));
-      if (message) {
-        if (message.includes("CALL_EXCEPTION") || message.includes("execution reverted")) {
-          message = t("profile.toast.contractOutdated");
+      if (!handleBlockOutOfRange(err)) {
+        let message = getErrorMessage(err, t("profile.toast.failure"));
+        if (message) {
+          if (message.includes("CALL_EXCEPTION") || message.includes("execution reverted")) {
+            message = t("profile.toast.contractOutdated");
+          }
+          push(ToastKind.Error, message);
         }
-        push(ToastKind.Error, message);
       }
     } finally {
       setPending(false);
@@ -147,8 +152,10 @@ export default function ProfilePage() {
       push(ToastKind.Success, t("profile.toast.cancelSuccess"));
       await refresh();
     } catch (err: unknown) {
-      const message = getErrorMessage(err, t("profile.toast.failure"));
-      if (message) push(ToastKind.Error, message);
+      if (!handleBlockOutOfRange(err)) {
+        const message = getErrorMessage(err, t("profile.toast.failure"));
+        if (message) push(ToastKind.Error, message);
+      }
     } finally {
       setPending(false);
     }

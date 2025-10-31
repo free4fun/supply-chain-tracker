@@ -25,9 +25,28 @@ import {
 import { useI18n } from "@/contexts/I18nContext";
 import { useRoleTheme } from "@/hooks/useRoleTheme";
 import { getErrorMessage } from "@/lib/errors";
+import { getCurrentContractAddress, resetProvider } from "@/lib/web3";
+import TokenDetailModal from "@/components/TokenDetailModal";
+import { getTokenDetail } from "@/lib/tokenDetail";
+// Helper: detect BlockOutOfRange and force full session cleanup
+function handleBlockOutOfRange(err: unknown) {
+  const msg = (typeof err === "string" ? err : (err as any)?.message || "") as string;
+  if (/BlockOutOfRange|block height|eth_call/i.test(msg)) {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+    } catch {}
+    try { resetProvider(); } catch {}
+    window.location.reload();
+    return true;
+  }
+  return false;
+}
 
-// Status keys for i18n lookup
-const STATUS_KEYS = ["Pending", "Accepted", "Rejected"] as const;
+// Status keys for i18n lookup (added Cancelled)
+const STATUS_KEYS = ["Pending", "Accepted", "Rejected", "Cancelled"] as const;
 const NEXT_ROLE: Record<string, string | null> = {
   Producer: "Factory",
   Factory: "Retailer",
@@ -35,7 +54,7 @@ const NEXT_ROLE: Record<string, string | null> = {
   Consumer: null,
 };
 
-type TransferRow = { id: number; from: string; to: string; tokenId: number; amount: number; status: number; tokenName?: string; fromDisplay?: string; toDisplay?: string };
+type TransferRow = { id: number; from: string; to: string; tokenId: number; amount: number; status: number; tokenName?: string; fromDisplay?: string; toDisplay?: string; contract: string };
 type TokenOption = { id: number; available: string; name?: string };
 type RecipientOption = { addr: string; role: string; company?: string; firstName?: string; lastName?: string };
 
@@ -45,6 +64,7 @@ export default function TransfersPage() {
   const { push } = useToast();
   const { t } = useI18n();
   const { theme } = useRoleTheme();
+  const [contractAddr, setContractAddr] = useState<string>(() => getCurrentContractAddress().toLowerCase());
 
   const schema = useMemo(
     () =>
@@ -70,6 +90,7 @@ export default function TransfersPage() {
   const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [loadingTokens, setLoadingTokens] = useState(false);
   const [availableByToken, setAvailableByToken] = useState<Record<number, bigint>>({});
+  const [modalTokenId, setModalTokenId] = useState<number | null>(null);
 
   const nextRole = activeRole ? NEXT_ROLE[activeRole] : undefined;
   const canCreate = Boolean(activeRole && ["Producer", "Factory", "Retailer"].includes(activeRole));
@@ -84,6 +105,7 @@ export default function TransfersPage() {
       if (!silent) setLoadingTransfers(true);
       try {
         const ids = await getUserTransfers(account);
+        const sourceContract = getCurrentContractAddress().toLowerCase();
         const inc: TransferRow[] = [];
         const out: TransferRow[] = [];
         const labelCache: Record<string, string> = {};
@@ -115,7 +137,7 @@ export default function TransfersPage() {
             try {
               const tv = await getTokenView(tokenId);
               tokenName = String(tv[2]);
-            } catch {}
+            } catch (err) { handleBlockOutOfRange(err); }
             const row: TransferRow = {
               id: Number(t[0]),
               from: t[1],
@@ -124,6 +146,7 @@ export default function TransfersPage() {
               amount: Number(t[5]),
               status: Number(t[6]),
               tokenName,
+              contract: sourceContract,
             };
             // Attach display labels for origin/destination
             try { row.fromDisplay = await buildLabel(row.from); } catch {}
@@ -131,7 +154,7 @@ export default function TransfersPage() {
             if (row.to.toLowerCase() === account.toLowerCase()) inc.push(row);
             if (row.from.toLowerCase() === account.toLowerCase()) out.push(row);
           } catch (err: unknown) {
-            console.error(err);
+            handleBlockOutOfRange(err) || console.error(err);
           }
         }
         // Sort by status first (pending first), then by ID in reverse chronological order (newest first)
@@ -139,7 +162,7 @@ export default function TransfersPage() {
         setIncoming(inc.sort(byStatusThenIdDesc));
         setOutgoing(out.sort(byStatusThenIdDesc));
       } catch (err: unknown) {
-        console.error(err);
+        handleBlockOutOfRange(err) || console.error(err);
       } finally {
         if (!silent) setLoadingTransfers(false);
       }
@@ -172,31 +195,32 @@ export default function TransfersPage() {
                 const amt = BigInt(v[5]);
                 pendingMap[tok] = (pendingMap[tok] ?? 0n) + amt;
               }
-            } catch {}
+            } catch (err) { handleBlockOutOfRange(err); }
           }
-        } catch {}
+        } catch (err) { handleBlockOutOfRange(err); }
         for (const id of ids) {
           try {
+            // Only allow transferring tokens CREATED by the current account
+            const tv = await getTokenView(Number(id));
+            const creator = String(tv[1] ?? "").toLowerCase();
+            if (creator !== account.toLowerCase()) continue; // skip received tokens
+
             const balance = await getTokenBalance(Number(id), account);
             const asBigInt = BigInt(balance);
             const pending = pendingMap[Number(id)] ?? 0n;
             const available = asBigInt > pending ? asBigInt - pending : 0n;
             if (available > 0n) {
-              let name: string | undefined = undefined;
-              try {
-                const tv = await getTokenView(Number(id));
-                name = String(tv[2]);
-              } catch {}
+              const name: string | undefined = String(tv[2] ?? `Token ${Number(id)}`);
               options.push({ id: Number(id), available: available.toString(), name });
             }
           } catch (err) {
-            console.error(err);
+            handleBlockOutOfRange(err) || console.error(err);
           }
         }
         setTokenOptions(options);
         setAvailableByToken(Object.fromEntries(options.map(o => [o.id, BigInt(o.available)])));
       } catch (err: unknown) {
-        console.error(err);
+        handleBlockOutOfRange(err) || console.error(err);
       } finally {
         if (!silent) setLoadingTokens(false);
       }
@@ -224,6 +248,41 @@ export default function TransfersPage() {
     },
     [nextRole]
   );
+
+  // Detect cambios de dirección de contrato vía eventos de storage
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "contract.address") {
+        const next = getCurrentContractAddress().toLowerCase();
+        if (next !== contractAddr) {
+          setContractAddr(next);
+          // Limpiar listas y refrescar del contrato actual
+          setIncoming([]);
+          setOutgoing([]);
+          void refreshTransfers();
+          void refreshTokens({ silent: true });
+          void refreshRecipients({ silent: true });
+        }
+      }
+    };
+    const onCustom = () => {
+      const next = getCurrentContractAddress().toLowerCase();
+      if (next !== contractAddr) {
+        setContractAddr(next);
+        setIncoming([]);
+        setOutgoing([]);
+        void refreshTransfers();
+        void refreshTokens({ silent: true });
+        void refreshRecipients({ silent: true });
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("contract.address.changed", onCustom as EventListener);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("contract.address.changed", onCustom as EventListener);
+    };
+  }, [contractAddr, refreshRecipients, refreshTokens, refreshTransfers]);
 
   useEffect(() => {
     void refreshTransfers();
@@ -296,6 +355,17 @@ export default function TransfersPage() {
     } catch {}
     try {
       setPending(true);
+      // Guard: only allow transferring tokens created by the sender
+      try {
+        const tokId = Number(parsed.data.tokenId);
+        const tv = await getTokenView(tokId);
+        const creator = String(tv[1] ?? "").toLowerCase();
+        if (!account || creator !== account.toLowerCase()) {
+          push("error", t("transfers.errors.generatedOnly"));
+          setPending(false);
+          return;
+        }
+      } catch {}
       await transfer(parsed.data.recipient, BigInt(parsed.data.tokenId), parsed.data.amount);
       push("success", t("transfers.success.created"));
       await refreshTransfers();
@@ -429,10 +499,11 @@ export default function TransfersPage() {
           {incoming.map(row => (
             <div
               key={row.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-surface bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3"
+              onClick={() => setModalTokenId(row.tokenId)}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-surface bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3 cursor-pointer"
             >
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                <p className="text-left text-sm font-semibold text-slate-800 dark:text-slate-100">
                   #{row.tokenId} · {row.tokenName ?? `Token ${row.tokenId}`} · {row.amount}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">{t("transfers.incoming.from", { address: `${row.fromDisplay ?? row.from}` })}</p>
@@ -443,7 +514,7 @@ export default function TransfersPage() {
                     ? "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500 dark:bg-rose-950 dark:text-rose-300"
                     : "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500 dark:bg-amber-950 dark:text-amber-300"
                 }`}>
-                  {t("transfers.status", { status: t(`dashboard.status.${STATUS_KEYS[row.status as 0 | 1 | 2] ?? String(row.status)}`) })}
+                  {t("transfers.status", { status: t(`dashboard.status.${STATUS_KEYS[row.status as 0 | 1 | 2 | 3] ?? String(row.status)}`) })}
                 </span>
               </div>
               {row.status === 0 ? (
@@ -494,9 +565,10 @@ export default function TransfersPage() {
           {outgoing.map(row => (
             <div
               key={row.id}
-              className="rounded-2xl border border-surface bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3"
+              onClick={() => setModalTokenId(row.tokenId)}
+              className="rounded-2xl border border-surface bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3 cursor-pointer"
             >
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              <p className="text-left text-sm font-semibold text-slate-800 dark:text-slate-100">
                 #{row.tokenId} · {row.tokenName ?? `Token ${row.tokenId}`} · {row.amount}
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">{t("transfers.outgoing.to", { address: `${row.toDisplay ?? row.to}` })}</p>
@@ -505,9 +577,11 @@ export default function TransfersPage() {
                   ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-300"
                   : row.status === 2
                   ? "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500 dark:bg-rose-950 dark:text-rose-300"
+                  : row.status === 3
+                  ? "border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-300"
                   : "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500 dark:bg-amber-950 dark:text-amber-300"
               }`}>
-                {t("transfers.status", { status: t(`dashboard.status.${STATUS_KEYS[row.status as 0 | 1 | 2] ?? String(row.status)}`) })}
+                {t("transfers.status", { status: t(`dashboard.status.${STATUS_KEYS[row.status as 0 | 1 | 2 | 3] ?? String(row.status)}`) })}
               </span>
               {row.status === 0 ? (
                 <div className="mt-2 flex gap-2">
@@ -515,13 +589,58 @@ export default function TransfersPage() {
                     className="rounded-full border border-rose-400 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60 dark:text-rose-300"
                     onClick={async () => {
                       try {
+                        // Preflight: ensure caller is sender and transfer is still pending
+                        try {
+                          // Si el contrato cambió desde que se listó, refrescar y abortar
+                          const currentAddr = getCurrentContractAddress().toLowerCase();
+                          if (currentAddr !== row.contract) {
+                            push("info", "Se actualizó el contrato. Refrescando la lista…");
+                            await refreshTransfers();
+                            return;
+                          }
+                          const v = await getTransfer(Number(row.id));
+                          const from = String(v[1] ?? (v as any).from ?? "");
+                          const status = Number(v[6] ?? (v as any).status ?? -1);
+                          if (!account || from.toLowerCase() !== account.toLowerCase()) {
+                            push("error", t("transfers.errors.cancelNotSender"));
+                            await refreshTransfers({ silent: true });
+                            return;
+                          }
+                          if (status !== 0) {
+                            push("error", t("transfers.errors.cancelNotPending"));
+                            await refreshTransfers({ silent: true });
+                            return;
+                          }
+                        } catch (preErr) {
+                          // If transfer doesn't exist in this contract, inform and stop
+                          const msg = preErr instanceof Error ? preErr.message : String(preErr ?? "");
+                          if (msg.toLowerCase().includes("transfer not found")) {
+                            push("error", t("transfers.errors.notFound"));
+                            await refreshTransfers({ silent: true });
+                            return;
+                          }
+                          // Otherwise, continue to attempt and handle below
+                        }
                         await cancelTransfer(BigInt(row.id));
                         push("success", t("transfers.success.cancelled"));
                         await refreshTransfers();
                         await refreshTokens({ silent: true });
                       } catch (err: unknown) {
-                        const message = getErrorMessage(err, t("transfers.errors.operation"));
-                        if (message) push("error", message);
+                        // Detect missing function / outdated contract at address
+                        const raw = err instanceof Error ? err.message : String(err ?? "");
+                        const lower = raw.toLowerCase();
+                        const isOutdated = lower.includes("function selector") || lower.includes("selector was not recognized");
+                        if (lower.includes("transfer not found")) {
+                          push("error", t("transfers.errors.notFound"));
+                          await refreshTransfers({ silent: true });
+                          return;
+                        }
+                        if (isOutdated) {
+                          push("error", t("profile.toast.contractOutdated"));
+                        } else {
+                          const message = getErrorMessage(err, t("transfers.errors.operation"));
+                          if (message) push("error", message);
+                        }
                       }
                     }}
                     disabled={!account}
@@ -534,6 +653,11 @@ export default function TransfersPage() {
           ))}
         </div>
       </section>
+      <TokenDetailModal
+        tokenId={modalTokenId}
+        onClose={() => setModalTokenId(null)}
+        fetchDetail={(id) => getTokenDetail(id, account)}
+      />
     </div>
   );
 }

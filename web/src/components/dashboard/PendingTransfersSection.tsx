@@ -1,7 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useRoleTheme } from "@/hooks/useRoleTheme";
+import TokenDetailModal from "@/components/TokenDetailModal";
+import { getTokenDetail } from "@/lib/tokenDetail";
+import { useWeb3 } from "@/contexts/Web3Context";
 
 export type PendingRow = {
   id: number;
@@ -29,6 +32,8 @@ export default function PendingTransfersSection({
   onReject: (id: number) => void;
 }) {
   const { theme } = useRoleTheme();
+  const { account } = useWeb3();
+  const [modalTokenId, setModalTokenId] = useState<number | null>(null);
   return (
     <section id="pending-transfers" className={`space-y-3 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-5 shadow-inner`}>
       <div className="flex items-center justify-between">
@@ -42,7 +47,10 @@ export default function PendingTransfersSection({
           {items.map(tr => (
             <li key={tr.id} className="rounded-xl border border-surface bg-surface-2 p-3 text-sm">
               <div className="flex items-center justify-between gap-3">
-                <div>
+                <div 
+                  onClick={() => setModalTokenId(tr.tokenId)}
+                  className="hover:bg-surface-3 rounded cursor-pointer"
+                >
                   <div className="flex items-center gap-2">
                     <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${tr.direction === 'in' ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-300' : 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950 dark:text-indigo-300'}`}>
                       {tr.direction === 'in' ? t('dashboard.activity.in') : t('dashboard.activity.out')}
@@ -72,6 +80,11 @@ export default function PendingTransfersSection({
           ))}
         </ul>
       )}
+      <TokenDetailModal
+        tokenId={modalTokenId}
+        onClose={() => setModalTokenId(null)}
+        fetchDetail={(id) => getTokenDetail(id, account)}
+      />
     </section>
   );
 }

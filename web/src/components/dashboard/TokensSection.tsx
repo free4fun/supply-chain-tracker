@@ -1,7 +1,9 @@
 "use client";
 
 import { useRoleTheme } from "@/hooks/useRoleTheme";
-import React from "react";
+import React, { useState } from "react";
+import TokenDetailModal from "@/components/TokenDetailModal";
+import { getTokenDetail } from "@/lib/tokenDetail";
 
 export default function TokensSection({
   t,
@@ -17,7 +19,10 @@ export default function TokensSection({
   loading: boolean;
 }) {
     const { theme } = useRoleTheme();
+    const [modalTokenId, setModalTokenId] = useState<number | null>(null);
+
   return (
+    <>
     <section id="my-tokens" className={`space-y-4 rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 p-6 shadow-inner`}>
       <h2 className="text-sm text-slate-700 dark:text-slate-300">Mis tokens</h2>
       {tokens.length === 0 && !loading ? (
@@ -26,7 +31,8 @@ export default function TokensSection({
       {tokens.map(id => (
         <div
           key={id}
-          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-surface bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3"
+          onClick={() => setModalTokenId(id)}
+          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-surface bg-surface-2 px-4 py-3 shadow-sm hover:bg-surface-3 cursor-pointer"
         >
           <div>
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">#{id} · {names[id] ?? `Token ${id}`}</p>
@@ -36,5 +42,13 @@ export default function TokensSection({
         </div>
       ))}
     </section>
+    {modalTokenId && (
+      <TokenDetailModal
+        tokenId={modalTokenId}
+        onClose={() => setModalTokenId(null)}
+        fetchDetail={getTokenDetail}
+      />
+    )}
+    </>
   );
 }

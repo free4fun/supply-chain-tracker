@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { changeStatusUser, scAdmin } from "@/lib/sc";
+import { handleBlockOutOfRange } from "@/lib/blockOutOfRange";
 import { isAddress } from "ethers";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { useToast } from "@/contexts/ToastContext";
@@ -24,7 +25,9 @@ export default function AdminPage() {
     return a && (a === ADMIN_ENV);
   }, [account]);
 
-  useEffect(() => { scAdmin().then(setOnchainAdmin).catch(()=>{}); }, []);
+  useEffect(() => {
+    scAdmin().then(setOnchainAdmin).catch((err) => { handleBlockOutOfRange(err); });
+  }, []);
 
   if (mustConnect)
     return (
@@ -54,7 +57,7 @@ export default function AdminPage() {
     if (!isAddress(addr)) return push("error", t("admin.page.errors.address"));
     try {
       setPending(true);
-      await changeStatusUser(addr, status);
+      await changeStatusUser(addr, status).catch((err) => { if (!handleBlockOutOfRange(err)) throw err; });
       push("success", t("admin.page.success"));
     } catch (e:any) { 
       const message = getErrorMessage(e, t("admin.page.txFailed"));

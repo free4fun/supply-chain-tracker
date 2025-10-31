@@ -2,6 +2,7 @@
 "use client";
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { BrowserProvider } from "ethers";
+import { resetProvider, getCurrentContractAddress } from "@/lib/web3";
 
 type EIP1193 = {
   request: (args: { method: string; params?: any[] }) => Promise<any>;
@@ -74,7 +75,11 @@ export function Web3Provider({ children }: { children: ReactNode }) {
     const orig = console.error;
     console.error = (...args: any[]) => {
       const s = args.map(a => (typeof a === "string" ? a : a?.message ? String(a.message) : "")).join(" ");
+      // Silence common, harmless wallet/provider probes:
+      // - User rejected requests
+      // - eth_call reverts for ERC20 symbol()/decimals() (0x95d89b41 / 0x313ce567) against non-ERC20 contracts
       if (/User rejected the request/i.test(s)) return;
+      if (/eth_call/i.test(s) && /execution reverted/i.test(s) && /(0x95d89b41|0x313ce567)/i.test(s)) return;
       orig(...args);
     };
     return () => { console.error = orig; };
@@ -88,10 +93,63 @@ export function Web3Provider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Opcional: forzar desconexión en cada reload (útil en dev) controlado por ENV o localStorage
+    let forceDisconnect = false;
+    try {
+      const byEnv = process.env.NEXT_PUBLIC_WEB3_FORCE_DISCONNECT_ON_RELOAD === "true";
+      const byLS = typeof window !== "undefined" && localStorage.getItem("web3.forceDisconnectOnReload") === "1";
+      forceDisconnect = Boolean(byEnv || byLS);
+      if (forceDisconnect && typeof window !== "undefined") {
+        localStorage.removeItem("web3.connected");
+        localStorage.removeItem("web3.account");
+        localStorage.removeItem("web3.chainId");
+        // marcar para UI
+        localStorage.setItem("web3.redeployDetected", "1");
+        resetProvider();
+      }
+    } catch {}
+
+    // If contract address changed since last load (env or runtime override), clear persisted session and force reconnect
+    try {
+      const currentAddr = (getCurrentContractAddress() ?? "").toLowerCase();
+      const prevAddr = typeof window !== "undefined" ? (localStorage.getItem("contract.address") || "").toLowerCase() : "";
+      if (prevAddr && currentAddr && prevAddr !== currentAddr) {
+        localStorage.removeItem("web3.connected");
+        localStorage.removeItem("web3.account");
+        localStorage.removeItem("web3.chainId");
+        localStorage.setItem("contract.address", currentAddr);
+        // avisar a la UI que hubo cambio/refresh de contrato
+        try { if (typeof window !== "undefined") localStorage.setItem("web3.redeployDetected", "1"); } catch {}
+        // Reset ethers BrowserProvider cache
+        resetProvider();
+        setState(s => ({ ...s, account: undefined, chainId: undefined, mustConnect: true }));
+      } else if (currentAddr && currentAddr !== prevAddr) {
+        localStorage.setItem("contract.address", currentAddr);
+      }
+    } catch {}
+
     (async () => {
       try {
         // Verificar si el usuario había conectado previamente (y no desconectó manualmente)
-        const wasConnected = typeof window !== "undefined" ? localStorage.getItem(LS_CONNECTED) === "1" : false;
+        const wasConnected = !forceDisconnect && (typeof window !== "undefined" ? localStorage.getItem(LS_CONNECTED) === "1" : false);
+
+        // Chequeo inmediato de reset de cadena: si el último bloque guardado es mayor al actual, forzar reset
+        try {
+          const p = new BrowserProvider(eth as any, "any");
+          const now = await p.getBlockNumber();
+          if (typeof window !== "undefined") {
+            const prev = Number(localStorage.getItem("web3.lastBlock") || "0");
+            if (Number.isFinite(prev) && prev > 0 && now < prev) {
+              localStorage.removeItem("web3.connected");
+              localStorage.removeItem("web3.account");
+              localStorage.removeItem("web3.chainId");
+              localStorage.setItem("web3.redeployDetected", "1");
+              resetProvider();
+            }
+            // guardar el bloque actual para futuras comparaciones
+            localStorage.setItem("web3.lastBlock", String(now));
+          }
+        } catch {}
         
         const [accs, cid] = await Promise.all([
           eth.request({ method: "eth_accounts" }),
@@ -117,6 +175,8 @@ export function Web3Provider({ children }: { children: ReactNode }) {
               localStorage.setItem(LS_CONNECTED, "1");
               localStorage.setItem(LS_ACCOUNT, accs[0]);
               if (cid) localStorage.setItem(LS_CHAIN, String(cid));
+              // limpiar bandera si existe
+              localStorage.removeItem("web3.redeployDetected");
             } else {
               localStorage.removeItem(LS_CONNECTED);
               localStorage.removeItem(LS_ACCOUNT);
@@ -129,7 +189,7 @@ export function Web3Provider({ children }: { children: ReactNode }) {
       }
     })();
 
-    const onAcc = (a: string[]) => {
+  const onAcc = (a: string[]) => {
       const nextAcc = a?.[0];
       // Persist or clear session
       try {
@@ -197,6 +257,29 @@ export function Web3Provider({ children }: { children: ReactNode }) {
       subscribe("disconnect", onDisconnect),
     ];
 
+    // Detect chain resets (block height decreases) and force a clean reconnect
+    try {
+      const p = new BrowserProvider(eth as any, "any");
+      const blockHandler = (bn: number) => {
+        try {
+          if (typeof window === "undefined") return;
+          const prev = Number(localStorage.getItem("web3.lastBlock") || "0");
+          if (Number.isFinite(prev) && prev > 0 && bn < prev) {
+            // Chain likely reset; clear session and reset provider
+            localStorage.removeItem("web3.connected");
+            localStorage.removeItem("web3.account");
+            localStorage.removeItem("web3.chainId");
+            localStorage.setItem("web3.redeployDetected", "1");
+            resetProvider();
+            setState(s => ({ ...s, account: undefined, chainId: undefined, mustConnect: true }));
+          }
+          localStorage.setItem("web3.lastBlock", String(bn));
+        } catch {}
+      };
+      (p as any).on?.("block", blockHandler);
+      unsubs.push(() => { try { (p as any).off?.("block", blockHandler); } catch {} });
+    } catch {}
+
     return () => {
       unsubs.forEach(unsub => {
         try {
@@ -261,6 +344,8 @@ export function Web3Provider({ children }: { children: ReactNode }) {
         localStorage.removeItem(LS_CHAIN);
       }
     } catch {}
+    // Reset cached provider so new calls don't reuse stale connections after chain resets
+    try { resetProvider(); } catch {}
     setState(s => ({
       ...s,
       account: undefined,

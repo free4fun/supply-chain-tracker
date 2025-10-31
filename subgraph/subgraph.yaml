@@ -1,0 +1,42 @@
+specVersion: 1.0.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: SupplyChain
+    network: localhost # Cambiar a 'sepolia' para testnet
+    source:
+      # Para local: dirección del contrato desplegado
+      # Para testnet: actualizar con la dirección en testnet
+      address: "0x5FbDB2315678afecb367f032d93F642f64180aa3" # ACTUALIZAR con tu dirección
+      abi: SupplyChain
+      # Para testnet, agregar startBlock para indexar más rápido:
+      # startBlock: 12345678
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Token
+        - Transfer
+        - User
+        - TokenInput
+      abis:
+        - name: SupplyChain
+          file: ./abis/SupplyChain.json
+      eventHandlers:
+        - event: TokenCreated(indexed uint256,indexed address,uint256)
+          handler: handleTokenCreated
+        - event: TransferInitiated(indexed uint256,indexed address,indexed address,uint256,uint256)
+          handler: handleTransferInitiated
+        - event: TransferAccepted(indexed uint256)
+          handler: handleTransferAccepted
+        - event: TransferRejected(indexed uint256)
+          handler: handleTransferRejected
+        - event: TransferCancelled(indexed uint256)
+          handler: handleTransferCancelled
+        - event: UserRegistered(indexed address,string)
+          handler: handleUserRegistered
+      file: ./src/mapping.ts

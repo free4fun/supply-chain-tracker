@@ -4,6 +4,9 @@
 import { getContract } from "@/lib/web3";
 import type { Provider, EventLog } from "ethers";
 
+// Force view calls to use the latest block tag to avoid BlockOutOfRange errors after chain resets/redeploys
+const CALL_OPTS = { blockTag: "latest" as any };
+
 export type UserView = {
   id: number;
   addr: string;
@@ -18,12 +21,12 @@ export type RoleReq = { user: string; role: string; blockNumber: number; txHash:
 
 export async function scAdmin(): Promise<string> {
   const sc = await getContract(false);
-  return sc.admin();
+  return sc.admin(CALL_OPTS);
 }
 
 export async function getUserInfo(addr: string) {
   const sc = await getContract(false);
-  return sc.getUserInfo(addr);
+  return sc.getUserInfo(addr, CALL_OPTS);
 }
 
 export async function requestUserRole(role: string): Promise<void> {
@@ -80,14 +83,14 @@ export async function createToken(
 
 export async function getTokenView(id: number) {
   const sc = await getContract(false);
-  return sc.getTokenView(id);
+  return sc.getTokenView(id, CALL_OPTS);
 }
 
 export type TokenComponent = { tokenId: number; amount: bigint };
 
 export async function getTokenInputs(tokenId: number): Promise<TokenComponent[]> {
   const sc = await getContract(false);
-  const raw = await sc.getTokenInputs(tokenId);
+  const raw = await sc.getTokenInputs(tokenId, CALL_OPTS);
   return raw.map((entry: any) => ({
     tokenId: Number(entry.tokenId ?? entry[0]),
     amount: BigInt(entry.amount ?? entry[1]),
@@ -96,13 +99,13 @@ export async function getTokenInputs(tokenId: number): Promise<TokenComponent[]>
 
 export async function nextTokenId(): Promise<number> {
   const sc = await getContract(false);
-  const n: bigint = await sc.nextTokenId();
+  const n: bigint = await sc.nextTokenId(CALL_OPTS);
   return Number(n);
 }
 
 export async function getSuggestedParent(addr: string) {
   const sc = await getContract(false);
-  return sc.getSuggestedParent(addr);
+  return sc.getSuggestedParent(addr, CALL_OPTS);
 }
 
 export async function transfer(to: string, tokenId: bigint, amount: bigint) {
@@ -131,27 +134,27 @@ export async function cancelTransfer(id: bigint) {
 
 export async function getTransfer(id: number) {
   const sc = await getContract(false);
-  return sc.getTransfer(id);
+  return sc.getTransfer(id, CALL_OPTS);
 }
 
 export async function getUserTokens(addr: string) {
   const sc = await getContract(false);
-  return sc.getUserTokens(addr);
+  return sc.getUserTokens(addr, CALL_OPTS);
 }
 
 export async function getUserTransfers(addr: string) {
   const sc = await getContract(false);
-  return sc.getUserTransfers(addr);
+  return sc.getUserTransfers(addr, CALL_OPTS);
 }
 
 export async function getTokenBalance(tokenId: number, addr: string) {
   const sc = await getContract(false);
-  return sc.getTokenBalance(tokenId, addr);
+  return sc.getTokenBalance(tokenId, addr, CALL_OPTS);
 }
 
 export async function getUserCreatedTokens(addr: string): Promise<number[]> {
   const sc = await getContract(false);
-  const ids: bigint[] = await sc.getUserCreatedTokens(addr);
+  const ids: bigint[] = await sc.getUserCreatedTokens(addr, CALL_OPTS);
   return ids.map(n => Number(n));
 }
 
@@ -164,7 +167,7 @@ export type CreatedSummary = {
 
 export async function getUserCreatedSummary(addr: string): Promise<CreatedSummary> {
   const sc = await getContract(false);
-  const res = await sc.getUserCreatedSummary(addr);
+  const res = await sc.getUserCreatedSummary(addr, CALL_OPTS);
   // Expect tuple [createdCount, totalSupplySum, availableSum, totalConsumedInputs]
   return {
     createdCount: Number(res[0]),
@@ -176,7 +179,7 @@ export async function getUserCreatedSummary(addr: string): Promise<CreatedSummar
 
 export async function getUserBalancesNonZero(addr: string): Promise<{ ids: number[]; balances: bigint[] }> {
   const sc = await getContract(false);
-  const [idsRaw, balancesRaw]: [bigint[], bigint[]] = await sc.getUserBalancesNonZero(addr);
+  const [idsRaw, balancesRaw]: [bigint[], bigint[]] = await sc.getUserBalancesNonZero(addr, CALL_OPTS);
   return {
     ids: idsRaw.map(Number),
     balances: balancesRaw.map(BigInt),
@@ -185,13 +188,13 @@ export async function getUserBalancesNonZero(addr: string): Promise<{ ids: numbe
 
 export async function nextUserId(): Promise<number> {
   const sc = await getContract(false);
-  const n: bigint = await sc.nextUserId();
+  const n: bigint = await sc.nextUserId(CALL_OPTS);
   return Number(n);
 }
 
 export async function getUserById(id: number): Promise<UserView> {
   const sc = await getContract(false);
-  const u = await sc.users(id);
+  const u = await sc.users(id, CALL_OPTS);
   // users mapping returns: [id, userAddress, role, pendingRole, status]
   return {
     id: Number(u[0]),

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { useI18n } from "@/contexts/I18nContext";
+import { handleBlockOutOfRange } from "@/lib/blockOutOfRange";
 
 const ANVIL_HEX = "0x7a69"; // 31337
 
@@ -15,15 +16,17 @@ export default function ChainGuard({ children }: { children: React.ReactNode }) 
     try {
       await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: ANVIL_HEX }] });
     } catch (e: any) {
-      if (e?.code === 4902) {
-        await eth.request({ method: "wallet_addEthereumChain", params: [{
-          chainId: ANVIL_HEX,
-          chainName: "Anvil 31337",
-          nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-          rpcUrls: [process.env.NEXT_PUBLIC_RPC_URL || "http://127.0.0.1:8545"],
-        }]});
-      } else {
-        setMsg(e?.message ?? t("chainGuard.error"));
+      if (!handleBlockOutOfRange(e)) {
+        if (e?.code === 4902) {
+          await eth.request({ method: "wallet_addEthereumChain", params: [{
+            chainId: ANVIL_HEX,
+            chainName: "Anvil 31337",
+            nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+            rpcUrls: [process.env.NEXT_PUBLIC_RPC_URL || "http://127.0.0.1:8545"],
+          }]});
+        } else {
+          setMsg(e?.message ?? t("chainGuard.error"));
+        }
       }
     }
   }

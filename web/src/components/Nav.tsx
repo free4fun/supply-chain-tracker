@@ -11,7 +11,7 @@ import { useRoleTheme } from "@/hooks/useRoleTheme";
 export default function Nav() {
   const pathname = usePathname();
   const { account, disconnect } = useWeb3();
-  const { activeRole, company, firstName, lastName } = useRole();
+  const { activeRole, company, firstName, lastName, isAdmin } = useRole();
   const { theme } = useRoleTheme();
   const { t, lang, available, setLanguage } = useI18n();
 
@@ -66,7 +66,7 @@ export default function Nav() {
   return (
     <header className={`rounded-3xl border ${theme.accentBorder} bg-white dark:bg-slate-900 px-3 shadow-lg backdrop-blur`}>
       <nav className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-200">
-         {activeRole && ROLE_LINKS[activeRole] ? (
+      {activeRole && ROLE_LINKS[activeRole] ? (
             ROLE_LINKS[activeRole].map((link) => {
               const isActive = pathname === link.href;
               return (
@@ -95,6 +95,31 @@ export default function Nav() {
               {t("nav.home")}
             </Link>
           )}
+
+        {isAdmin ? (
+          <>
+            <Link
+              href="/admin/users"
+              className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                pathname === "/admin/users"
+                  ? `bg-gradient-to-r ${theme.gradient} !text-white shadow-md`
+                  : "border border-surface text-slate-600 hover:border-accent hover:text-accent dark:text-slate-200"
+              }`}
+            >
+              {t("nav.adminUsers")}
+            </Link>
+            <Link
+              href="/admin/settings"
+              className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                pathname === "/admin/settings"
+                  ? `bg-gradient-to-r ${theme.gradient} !text-white shadow-md`
+                  : "border border-surface text-slate-600 hover:border-accent hover:text-accent dark:text-slate-200"
+              }`}
+            >
+              {t("nav.adminSettings") ?? "Admin Settings"}
+            </Link>
+          </>
+        ) : null}
 
         <div className="ml-auto flex items-center gap-2">
           {account && (

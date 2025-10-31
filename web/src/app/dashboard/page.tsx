@@ -8,6 +8,7 @@ import { useRole } from "@/contexts/RoleContext";
 import { useBlockWatcher } from "@/hooks/useBlockWatcher";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { getUserTokens, getTokenBalance, getUserTransfers, getTransfer, getTokenView, acceptTransfer, rejectTransfer, getUserCreatedSummary, getUserBalancesNonZero, getUserCreatedTokens } from "@/lib/sc";
+import { resetProvider } from "@/lib/web3";
 import RecentTransfers, { type RecentItem } from "@/components/RecentTransfers";
 import StatsSection from "@/components/dashboard/StatsSection";
 import TimelineSection from "@/components/dashboard/TimelineSection";
@@ -48,6 +49,23 @@ export default function Dashboard() {
   const [timelineCounts, setTimelineCounts] = useState<number[]>([]);
   const [timelineMode, setTimelineMode] = useState<"count" | "volume">("count");
 
+  // Helper: detect BlockOutOfRange and force full session cleanup
+  function handleBlockOutOfRange(err: unknown) {
+    const msg = (typeof err === "string" ? err : (err as any)?.message || "") as string;
+    if (/BlockOutOfRange|block height|eth_call/i.test(msg)) {
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.clear();
+          sessionStorage.clear();
+        }
+      } catch {}
+      try { resetProvider(); } catch {}
+      window.location.reload();
+      return true;
+    }
+    return false;
+  }
+
   const refreshBalances = useCallback(
     async ({ silent }: { silent?: boolean } = {}) => {
       if (!account || mustConnect) {
@@ -76,7 +94,7 @@ export default function Dashboard() {
         for (const e of entries) if (e.name) nameMap[e.id] = e.name;
         setTokenNames(nameMap);
       } catch (err: unknown) {
-        console.error(err);
+        if (!handleBlockOutOfRange(err)) console.error(err);
       } finally {
         if (!silent) setLoading(false);
       }
@@ -104,11 +122,11 @@ export default function Dashboard() {
       try {
         const [created, inv] = await Promise.all([
           getUserCreatedSummary(account).catch((err) => {
-            console.error("getUserCreatedSummary error:", err);
+            if (!handleBlockOutOfRange(err)) console.error("getUserCreatedSummary error:", err);
             return null;
           }),
           getUserBalancesNonZero(account).catch((err) => {
-            console.error("getUserBalancesNonZero error:", err);
+            if (!handleBlockOutOfRange(err)) console.error("getUserBalancesNonZero error:", err);
             return null;
           }),
         ]);
@@ -165,15 +183,15 @@ export default function Dashboard() {
             const tokenId = Number(v[3]);
             const date = Number(v[4]);
             const amount = BigInt(v[5]);
-            const status = Number(v[6]) as 0 | 1 | 2;
+            const status = Number(v[6]) as 0 | 1 | 2 | 3;
             const direction: "in" | "out" = to.toLowerCase() === account.toLowerCase() ? "in" : "out";
             let tokenName: string | undefined = undefined;
             try {
               const tv = await getTokenView(tokenId);
               tokenName = String(tv[2]);
-            } catch {}
+            } catch (err) { handleBlockOutOfRange(err); }
             items.push({ type: "transfer", id, direction, status, tokenId, tokenName, amount, dateCreated: date });
-          } catch {}
+          } catch (err) { handleBlockOutOfRange(err); }
         }
         // Creations
         for (const tokenId of createdTokenIds) {
@@ -183,7 +201,7 @@ export default function Dashboard() {
             const totalSupply = BigInt(tv[4]);
             const date = Number(tv[7]);
             items.push({ type: "creation", id: Number(tokenId), tokenId: Number(tokenId), tokenName: name, totalSupply, dateCreated: date });
-          } catch {}
+          } catch (err) { handleBlockOutOfRange(err); }
         }
         // Build timeline buckets for current calendar month (UTC), one bucket per day
         const now = new Date();
@@ -249,7 +267,7 @@ export default function Dashboard() {
               try {
                 const tv = await getTokenView(tokenId);
                 tokenName = String(tv[2]);
-              } catch {}
+              } catch (err) { handleBlockOutOfRange(err); }
               rows.push({
                 id,
                 from,
@@ -262,7 +280,7 @@ export default function Dashboard() {
                 direction: isIncoming ? "in" : "out",
               });
             }
-          } catch {}
+          } catch (err) { handleBlockOutOfRange(err); }
         }
         if (!cancel) setPendingTransfers(rows.sort((a,b)=> b.dateCreated - a.dateCreated));
       } catch (err) {
@@ -342,7 +360,7 @@ export default function Dashboard() {
                 const tokenId = Number(v[3]);
                 const date = Number(v[4]);
                 const amount = BigInt(v[5]);
-                const status = Number(v[6]) as 0 | 1 | 2;
+                const status = Number(v[6]) as 0 | 1 | 2 | 3;
                 const direction: "in" | "out" = to.toLowerCase() === account.toLowerCase() ? "in" : "out";
                 let tokenName: string | undefined = undefined;
                 try {

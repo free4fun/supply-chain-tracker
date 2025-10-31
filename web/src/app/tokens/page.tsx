@@ -14,7 +14,24 @@ import { useRole } from "@/contexts/RoleContext";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { useI18n } from "@/contexts/I18nContext";
 import { useRoleTheme } from "@/hooks/useRoleTheme";
-
+import { resetProvider } from "@/lib/web3";
+import TokenDetailModal from "@/components/TokenDetailModal";
+// Helper: detect BlockOutOfRange and force full session cleanup
+function handleBlockOutOfRange(err: unknown) {
+  const msg = (typeof err === "string" ? err : (err as any)?.message || "") as string;
+  if (/BlockOutOfRange|block height|eth_call/i.test(msg)) {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+    } catch {}
+    try { resetProvider(); } catch {}
+    window.location.reload();
+    return true;
+  }
+  return false;
+}
 
 type TokenDetail = {
   id: number;
@@ -79,13 +96,16 @@ function MetadataPanel({ metadata }: { metadata: Record<string, unknown> | null 
   );
 }
 
-function TraceTree({ node, depth = 0 }: { node: TraceNode; depth?: number }) {
+function TraceTree({ node, depth = 0, onTokenClick }: { node: TraceNode; depth?: number; onTokenClick: (id: number) => void }) {
   return (
     <li className="relative pl-6">
       {depth > 0 ? (
         <span className="absolute left-0 top-3 h-full border-l-2 border-surface" aria-hidden />
       ) : null}
-      <div className="rounded-2xl border border-surface bg-surface-2 p-4 shadow-sm hover:bg-surface-3">
+      <button
+        onClick={() => onTokenClick(node.detail.id)}
+        className="w-full text-left rounded-2xl border border-surface bg-surface-2 p-4 shadow-sm hover:bg-surface-3 hover:border-indigo-400 transition cursor-pointer"
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-sm font-semibold text-slate-800">#{node.detail.id} · {node.detail.name}</p>
@@ -116,11 +136,11 @@ function TraceTree({ node, depth = 0 }: { node: TraceNode; depth?: number }) {
             </div>
           </div>
         ) : null}
-      </div>
+      </button>
       {node.children.length ? (
         <ul className="mt-3 space-y-3">
-          {node.children.map(child => (
-            <TraceTree key={`${node.detail.id}-${child.detail.id}`} node={child} depth={depth + 1} />
+          {node.children.map((child, idx) => (
+            <TraceTree key={`${node.detail.id}-${child.detail.id}-${idx}`} node={child} depth={depth + 1} onTokenClick={onTokenClick} />
           ))}
         </ul>
       ) : null}
@@ -137,6 +157,7 @@ export default function TokensPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [trace, setTrace] = useState<TraceNode | null>(null);
   const [loading, setLoading] = useState(false);
+  const [modalTokenId, setModalTokenId] = useState<number | null>(null);
 
   const cacheRef = useRef(new Map<number, TokenDetail>());
 
@@ -145,11 +166,17 @@ export default function TokensPage() {
   const fetchDetail = useCallback(
     async (id: number, options: { includeBalance?: boolean } = {}): Promise<TokenDetail> => {
       const cached = cacheRef.current.get(id);
-      if (cached && (!options.includeBalance || typeof cached.balance === "bigint")) {
+      // Solo usar caché si tenemos balance Y inputs
+      if (cached && cached.inputs && (!options.includeBalance || typeof cached.balance === "bigint")) {
         return cached;
       }
-      const view = await getTokenView(id);
-      const components = await getTokenInputs(id);
+      let view, components;
+      try {
+        view = await getTokenView(id);
+      } catch (err) { handleBlockOutOfRange(err); throw err; }
+      try {
+        components = await getTokenInputs(id);
+      } catch (err) { handleBlockOutOfRange(err); throw err; }
       const features = String(view[5]);
       let balance = cached?.balance ?? 0n;
       if (options.includeBalance && account) {
@@ -157,7 +184,7 @@ export default function TokensPage() {
           const raw = await getTokenBalance(id, account);
           balance = BigInt(raw);
         } catch (err) {
-          console.error(err);
+          handleBlockOutOfRange(err) || console.error(err);
         }
       }
       const detail: TokenDetail = {
@@ -182,16 +209,15 @@ export default function TokensPage() {
 
   const buildTrace = useCallback(
     async (rootId: number): Promise<TraceNode> => {
-      const visited = new Set<number>();
-      const walk = async (id: number, amount?: bigint): Promise<TraceNode> => {
+      const walk = async (id: number, amount?: bigint, depth: number = 0): Promise<TraceNode> => {
         const detail = await fetchDetail(id);
-        if (visited.has(id)) {
+        // Limitar profundidad para evitar ciclos infinitos
+        if (depth > 20) {
           return { detail, amount, children: [] };
         }
-        visited.add(id);
         const children: TraceNode[] = [];
         for (const input of detail.inputs) {
-          children.push(await walk(input.tokenId, input.amount));
+          children.push(await walk(input.tokenId, input.amount, depth + 1));
         }
         return { detail, amount, children };
       };
@@ -219,7 +245,7 @@ export default function TokensPage() {
             cacheRef.current.set(id, detail);
             if (detail.balance > 0n) owned.push(detail);
           } catch (err) {
-            console.error(err);
+            handleBlockOutOfRange(err) || console.error(err);
           }
         }
         owned.sort((a, b) => b.createdAt - a.createdAt || b.id - a.id);
@@ -310,31 +336,32 @@ export default function TokensPage() {
               {tokens.map(token => {
                 const isActive = selectedId === token.id;
                 return (
-                  <button
-                    key={token.id}
-                    type="button"
-                    onClick={() => setSelectedId(token.id)}
-                    className={`rounded-2xl border px-4 py-3 text-left shadow-sm transition ${
-                      isActive
-                        ? `border-transparent bg-gradient-to-r ${theme.gradient} text-white`
-                        : `${theme.accentBorder} bg-surface-2 text-slate-700 hover:border-accent`
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold">#{token.id} · {token.name}</p>
-                        <p className={`text-xs ${isActive ? "text-white/80" : "text-slate-500"}`}>
-                          {token.description || "Sin descripción"}
-                        </p>
+                  <div key={token.id} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedId(token.id); setModalTokenId(token.id); }}
+                      className={`w-full rounded-2xl border px-4 py-3 text-left shadow-sm transition cursor-pointer ${
+                        isActive
+                          ? `border-transparent bg-gradient-to-r ${theme.gradient} text-white`
+                          : `${theme.accentBorder} bg-surface-2 text-slate-700 hover:border-accent`
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold">#{token.id} · {token.name}</p>
+                          <p className={`text-xs ${isActive ? "text-white/80" : "text-slate-500"}`}>
+                            {token.description || "Sin descripción"}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold">Saldo: {formatBigInt(token.balance)}</p>
+                          <p className={`text-xs ${isActive ? "text-white/80" : "text-slate-500"}`}>
+                            Disponible global: {formatBigInt(token.availableSupply)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold">Saldo: {formatBigInt(token.balance)}</p>
-                        <p className={`text-xs ${isActive ? "text-white/80" : "text-slate-500"}`}>
-                          Disponible global: {formatBigInt(token.availableSupply)}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -364,10 +391,10 @@ export default function TokensPage() {
               <div>
                 <h3 className="text-sm font-semibold text-slate-700">Cadena de trazabilidad</h3>
                 <p className="text-xs text-slate-500">
-                  Cada nivel muestra los tokens origen y las cantidades utilizadas para crear el activo seleccionado.
+                  Cada nivel muestra los tokens origen y las cantidades utilizadas para crear el activo seleccionado. Hacé click en cualquier token para ver sus detalles completos.
                 </p>
                 <ul className="mt-3 space-y-3">
-                  <TraceTree node={trace} />
+                  <TraceTree node={trace} onTokenClick={(id) => setModalTokenId(id)} />
                 </ul>
               </div>
             </div>
@@ -376,6 +403,12 @@ export default function TokensPage() {
           )}
         </section>
       </div>
+
+      <TokenDetailModal
+        tokenId={modalTokenId}
+        onClose={() => setModalTokenId(null)}
+        fetchDetail={fetchDetail}
+      />
     </div>
   );
 }

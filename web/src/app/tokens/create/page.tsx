@@ -1,4 +1,3 @@
-// web/src/app/tokens/create/page.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -20,6 +19,26 @@ import {
 import { useI18n } from "@/contexts/I18nContext";
 import { useRoleTheme } from "@/hooks/useRoleTheme";
 import { getErrorMessage } from "@/lib/errors";
+import TokenDetailModal from "@/components/TokenDetailModal";
+import { getTokenDetail } from "@/lib/tokenDetail";
+import { resetProvider } from "@/lib/web3";
+function handleBlockOutOfRange(err: unknown) {
+  const msg = (typeof err === "string" ? err : (err as any)?.message || "") as string;
+  if (/BlockOutOfRange|block height|eth_call/i.test(msg)) {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+    } catch {}
+    try { resetProvider(); } catch {}
+    window.location.reload();
+    return true;
+  }
+  return false;
+}
+
+
 
 const JSON_SPACING = 2;
 
@@ -193,6 +212,7 @@ export default function CreateTokenPage() {
   const [pending, setPending] = useState(false);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [pendingOutgoingByToken, setPendingOutgoingByToken] = useState<Record<number, bigint>>({});
+  const [modalTokenId, setModalTokenId] = useState<number | null>(null);
 
   const { push } = useToast();
   const { account } = useWeb3();
@@ -263,9 +283,9 @@ export default function CreateTokenPage() {
               if (to === account.toLowerCase() && status === 1) {
                 receivedSet.add(Number(tr[3]));
               }
-            } catch {}
+            } catch (err) { handleBlockOutOfRange(err); }
           }
-        } catch {}
+        } catch (err) { handleBlockOutOfRange(err); }
 
         const rows: InventoryToken[] = [];
         for (const rawId of tokenIds) {
@@ -274,8 +294,8 @@ export default function CreateTokenPage() {
           if (!receivedSet.has(id)) continue;
           try {
             const [view, balance] = await Promise.all([
-              getTokenView(id),
-              getTokenBalance(id, account),
+              getTokenView(id).catch((err) => { handleBlockOutOfRange(err); throw err; }),
+              getTokenBalance(id, account).catch((err) => { handleBlockOutOfRange(err); throw err; }),
             ]);
             // Exclude tokens that the user themselves created
             const creator = String(view[1] ?? "").toLowerCase();
@@ -294,7 +314,7 @@ export default function CreateTokenPage() {
               metadata,
             });
           } catch (err) {
-            console.error(err);
+            handleBlockOutOfRange(err) || console.error(err);
           }
         }
         if (!cancelled) setInventory(rows);
@@ -372,6 +392,29 @@ export default function CreateTokenPage() {
     };
   }, [account]);
 
+  // Prefijar el primer componente con el padre sugerido si aplica y está en inventario
+  useEffect(() => {
+    if (!config?.requiresComponents) return;
+    if (!suggestedParent || suggestedParent === 0n) return;
+    const pid = Number(suggestedParent);
+    const exists = availableInventory.some(t => t.id === pid);
+    if (!exists) return; // no disponible: el usuario debe aceptar una transferencia del padre
+    setInputs(curr => {
+      if (!curr || curr.length === 0) return [{ tokenId: pid, amount: "" }];
+      const first = curr[0];
+      if (!first.tokenId) return [{ ...first, tokenId: pid }, ...curr.slice(1)];
+      // Si ya está en otra fila, lo movemos al frente, conservando amount
+      const idx = curr.findIndex(r => r.tokenId === pid);
+      if (idx > 0) {
+        const copy = [...curr];
+        const [row] = copy.splice(idx, 1);
+        copy.unshift(row);
+        return copy;
+      }
+      return curr;
+    });
+  }, [config?.requiresComponents, suggestedParent, availableInventory]);
+
   const updateInputRow = useCallback((index: number, patch: Partial<IngredientRow>) => {
     setInputs(current => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }, []);
@@ -440,13 +483,9 @@ export default function CreateTokenPage() {
           return;
         }
 
-        // Enforce contract rule: the first component must match the suggested parent when present
+        // Si hay un padre sugerido y está entre los componentes, lo movemos al frente como pista visual (no obligatorio)
         if (suggestedParent && suggestedParent !== 0n) {
           const idx = components.findIndex(c => c.tokenId === suggestedParent);
-          if (idx === -1) {
-            push("error", t("tokens.create.errors.parentRequired", { id: suggestedParent.toString() }));
-            return;
-          }
           if (idx > 0) {
             const [parentComp] = components.splice(idx, 1);
             components.unshift(parentComp);
@@ -520,7 +559,9 @@ export default function CreateTokenPage() {
     [pending, canCreate, account, config, name, supply, inputs, availableInventory, metadataMode, rawMetadata, roleKey, formMetadata, identity, description, push]
   );
 
-  if (!roleLoading && !isApproved && !isAdmin) {
+  // Block token creation unless the user is Approved, even if they are admin.
+  // Admin privileges do not bypass on-chain approval checks.
+  if (!roleLoading && !isApproved) {
     return (
       <div className="rounded-3xl border border-amber-300/60 bg-amber-50/80 p-6 text-sm text-amber-900 shadow-sm">
         <p className="font-semibold">{t("tokens.create.notApprovedTitle")}</p>
@@ -702,8 +743,13 @@ export default function CreateTokenPage() {
                       Quitar
                     </button>
                     {row.tokenId ? (
-                      <div className="md:col-span-3 rounded-2xl border border-surface bg-surface-2 p-3 text-xs text-slate-600">
-                        <p className="font-semibold">Resumen del token #{row.tokenId}</p>
+                      <div 
+                        onClick={() => setModalTokenId(row.tokenId!)}
+                        className="md:col-span-3 rounded-2xl border border-surface bg-surface-2 p-3 text-xs text-slate-600 hover:bg-surface-3 cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold">Resumen del token #{row.tokenId}</p>
+                        </div>
                         {(() => {
                           const item = availableInventory.find(i => i.id === row.tokenId);
                           const bal = item?.balance ?? 0n;
@@ -747,6 +793,11 @@ export default function CreateTokenPage() {
           </button>
         </footer>
       </form>
+      <TokenDetailModal
+        tokenId={modalTokenId}
+        onClose={() => setModalTokenId(null)}
+        fetchDetail={(id) => getTokenDetail(id, account)}
+      />
     </div>
   );
 }

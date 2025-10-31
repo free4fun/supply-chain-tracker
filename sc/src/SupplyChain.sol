@@ -415,11 +415,9 @@ contract SupplyChain {
         } else {
             require(inputIds.length == inputAmounts.length, "Inputs mismatch");
             require(inputIds.length > 0, "Inputs required");
-            uint256 suggested = _resolveParentId(role);
+            // Parent ID is informational: we take the first component as the parent for traceability,
+            // but we do NOT enforce it to match any suggested value. Suggested parent is now a UI hint only.
             parentId = inputIds[0];
-            if (suggested != 0) {
-                require(suggested == parentId, "Parent mismatch");
-            }
         }
 
         uint256 tokenId = nextTokenId++;
@@ -485,6 +483,9 @@ contract SupplyChain {
         require(_isValidRoute(msg.sender, to), "Invalid route");
 
         Token storage t = tokens[tokenId];
+
+    // Only the creator of the token can transfer it (not received tokens)
+    require(t.creator == msg.sender, "Only creator can transfer this token");
 
         // Available amount considering reservations
         uint256 available = t.balance[msg.sender] - reservedPendingOut[tokenId][msg.sender];
