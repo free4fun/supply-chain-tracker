@@ -562,7 +562,7 @@ export default function Dashboard() {
             onAccept={handleAccept}
             onReject={handleReject}
           />
-          <RecentTransfers items={recent} t={t} />
+          <RecentTransfers items={recent} />
         </div>
 
         {/* Columna derecha: apilado vertical */}

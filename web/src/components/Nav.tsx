@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useRole } from "@/contexts/RoleContext";
 import { useI18n } from "@/contexts/I18nContext";
@@ -15,31 +15,18 @@ export default function Nav() {
   const { theme } = useRoleTheme();
   const { t, lang, available, setLanguage } = useI18n();
 
-  const ROLE_LINKS: Record<string, { href: string; labelKey: string }[]> = {
-    Producer: [
-        { href: "/dashboard", labelKey: "nav.dashboard" },
-        { href: "/tokens", labelKey: "nav.viewTokens" },
-        { href: "/tokens/create", labelKey: "nav.createToken" },
-        { href: "/transfers", labelKey: "nav.viewTransfers" },
-    ],
-    Factory: [
-        { href: "/dashboard", labelKey: "nav.dashboard" },
-        { href: "/tokens", labelKey: "nav.viewTokens" },
-        { href: "/tokens/create", labelKey: "nav.createToken" },
-        { href: "/transfers", labelKey: "nav.viewTransfers" },
-    ],
-    Retailer: [
-        { href: "/dashboard", labelKey: "nav.dashboard" },
-        { href: "/tokens", labelKey: "nav.viewTokens" },
-        { href: "/tokens/create", labelKey: "nav.createToken" },
-        { href: "/transfers", labelKey: "nav.viewTransfers" },
-    ],
-    Consumer: [
-        { href: "/dashboard", labelKey: "nav.dashboard" },
-        { href: "/tokens", labelKey: "nav.viewTokens" },
-        { href: "/transfers", labelKey: "nav.viewTransfers" },
-    ],
-};
+  const roleLinks = useMemo(() => {
+    const baseLinks = [
+      { href: "/dashboard", labelKey: "nav.dashboard" },
+      { href: "/tokens", labelKey: "nav.viewTokens" },
+    ];
+    return {
+      Producer: [...baseLinks, { href: "/tokens/create", labelKey: "nav.createToken" }, { href: "/transfers", labelKey: "nav.viewTransfers" }],
+      Factory: [...baseLinks, { href: "/tokens/create", labelKey: "nav.createToken" }, { href: "/transfers", labelKey: "nav.viewTransfers" }],
+      Retailer: [...baseLinks, { href: "/tokens/create", labelKey: "nav.createToken" }, { href: "/transfers", labelKey: "nav.viewTransfers" }],
+      Consumer: [...baseLinks, { href: "/transfers", labelKey: "nav.viewTransfers" }],
+    } as Record<string, { href: string; labelKey: string }[]>;
+  }, []);
 
   const contactName = account ? [firstName, lastName].filter(Boolean).join(" ") : "";
   const displayCompany = account ? (company || t("landing.connection.role.none")) : t("landing.connection.role.none");
@@ -66,8 +53,8 @@ export default function Nav() {
   return (
     <header className={`rounded-3xl border bg-white dark:bg-slate-900 px-3 shadow-lg backdrop-blur ${theme.containerBorder}`}>
       <nav className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-200">
-      {activeRole && ROLE_LINKS[activeRole] ? (
-            ROLE_LINKS[activeRole].map((link) => {
+      {activeRole && roleLinks[activeRole] ? (
+            roleLinks[activeRole].map((link) => {
               const isActive = pathname === link.href;
               return (
                 <Link
@@ -136,8 +123,8 @@ export default function Nav() {
             type="button"
             onClick={toggleDark}
             className={`rounded-full border px-3 py-1 text-xs font-semibold transition text-slate-600 dark:text-slate-200 ${theme.linkBorder} ${theme.linkHoverBorder} ${theme.linkHoverShadow}`}
-            title={isDark ? t("common.light") ?? "Light" : t("common.dark") ?? "Dark"}
-            aria-label="Toggle dark mode"
+            title={isDark ? t("common.theme.light") : t("common.theme.dark")}
+            aria-label={t("nav.themeToggle")}
           >
             {isDark ? "☀️" : "🌙"}
           </button>
@@ -148,7 +135,8 @@ export default function Nav() {
               setLanguage(next);
             }}
             className={`rounded-full border px-3 py-1 text-xs font-semibold transition text-slate-600 dark:text-slate-200 ${theme.linkBorder} ${theme.linkHoverBorder} ${theme.linkHoverShadow}`}
-            title={lang === "en" ? "Cambiar a Español" : "Switch to English"}
+            title={t("nav.languageToggleTooltip", { lang: lang === "en" ? "Español" : "English" })}
+            aria-label={t("nav.languageToggle")}
           >
             {lang === "en" ? "🇪🇸" : "🇺🇸"}
           </button>

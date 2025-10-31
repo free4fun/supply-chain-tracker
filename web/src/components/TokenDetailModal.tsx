@@ -25,11 +25,11 @@ type TokenDetail = {
   features: string;
 };
 
-function formatBigInt(value: bigint): string {
-  return value.toLocaleString("es-AR");
+function formatBigInt(value: bigint, locale: string): string {
+  return value.toLocaleString(locale);
 }
 
-function formatDate(timestamp: number | string | undefined): string {
+function formatDate(timestamp: number | string | undefined, locale: string): string {
   if (!timestamp) return "—";
   // Si es string, intentar parsear (puede ser ISO o Unix timestamp string)
   let ts: number;
@@ -52,7 +52,7 @@ function formatDate(timestamp: number | string | undefined): string {
     ts = ts * 1000;
   }
   
-  return new Date(ts).toLocaleString("es-AR", { 
+  return new Date(ts).toLocaleString(locale, {
     timeZone: "UTC",
     year: "numeric",
     month: "2-digit",
@@ -69,7 +69,7 @@ function formatKey(key: string): string {
     .replace(/^\w/, c => c.toUpperCase());
 }
 
-function formatValue(value: unknown): string {
+function formatValue(value: unknown, locale: string): string {
   if (value === null || value === undefined) return "—";
   if (typeof value === "object") return JSON.stringify(value, null, 2);
   // Si parece una fecha, formatearla
@@ -77,7 +77,7 @@ function formatValue(value: unknown): string {
     const str = String(value);
     // Detectar formatos de fecha comunes
     if (/^\d{4}-\d{2}-\d{2}/.test(str) || /^\d{10,13}$/.test(str)) {
-      return formatDate(value as any);
+      return formatDate(value as any, locale);
     }
   }
   return String(value);
@@ -102,10 +102,10 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
   const [creatorInfo, setCreatorInfo] = useState<{ role?: string; company?: string; firstName?: string; lastName?: string } | null>(null);
   const [inputs, setInputs] = useState<Array<{ tokenId: number; amount: bigint; name?: string; creator?: string; creatorCompany?: string; creatorRole?: string; createdAt?: number; acquiredAt?: number; metadata?: Record<string, unknown> }>>([]);
   const [grandInputsByParent, setGrandInputsByParent] = useState<Record<number, Array<{ tokenId: number; amount: bigint; name?: string; creator?: string; creatorCompany?: string; creatorRole?: string; createdAt?: number; acquiredAt?: number; metadata?: Record<string, unknown> }>>>({});
-  const [factoryTokens, setFactoryTokens] = useState<Array<{ tokenId: number; name: string; amount: bigint; date: number }>>([]);
   const { activeRole } = useRole();
   const { theme } = useRoleTheme();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const locale = useMemo(() => (lang === "es" ? "es-AR" : "en-US"), [lang]);
 
   useEffect(() => {
     if (!tokenId) {
@@ -263,17 +263,29 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
   }, [detail?.metadata, creatorInfo?.role]);
 
   // Render helpers por etapas
-  function Stage({ title, company, date, inputs: stageInputs, showComponents = true, componentLabel = "Componentes utilizados" }: { title: string; company?: string; date?: number; inputs?: typeof inputs; showComponents?: boolean; componentLabel?: string }) {
+  function Stage({
+    titleKey,
+    company,
+    inputs: stageInputs,
+    showComponents = true,
+    componentLabelKey = "tokens.detail.stage.componentsUsed",
+  }: {
+    titleKey: string;
+    company?: string;
+    inputs?: typeof inputs;
+    showComponents?: boolean;
+    componentLabelKey?: string;
+  }) {
     return (
       <section className="space-y-2">
-        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</h3>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t(titleKey)}</h3>
         <div className="rounded-2xl border border-surface bg-surface-2 p-4 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="font-medium">{company ? company : "Empresa no registrada"}</p>
+            <p className="font-medium">{company ?? t("tokens.detail.company.unknown")}</p>
           </div>
           {showComponents && stageInputs && stageInputs.length > 0 ? (
             <div className="mt-3 space-y-3">
-              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">{componentLabel}</p>
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">{t(componentLabelKey)}</p>
               <ul className="grid gap-3">
                 {stageInputs.map((c, idx) => {
                   // Filtrar metadata para excluir campos ocultos
@@ -288,17 +300,17 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
                       <div className="flex items-start justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-700">
                         <div className="flex-1">
                           <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                            #{c.tokenId} · {c.name ?? `Token ${c.tokenId}`}
+                            {t("dashboard.inventory.token", { id: c.tokenId })} · {c.name ?? t("tokens.common.fallbackNameShort", { id: c.tokenId })}
                           </p>
                           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                            {t("tokens.detail.quantity")} <span className="font-semibold text-slate-800 dark:text-slate-200">{formatBigInt(c.amount)}</span>
+                            {t("tokens.detail.quantity")} <span className="font-semibold text-slate-800 dark:text-slate-200">{formatBigInt(c.amount, locale)}</span>
                           </p>
                         </div>
                         <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                          {c.acquiredAt ? formatDate(c.acquiredAt) : (c.createdAt ? formatDate(c.createdAt) : "")}
+                          {c.acquiredAt ? formatDate(c.acquiredAt, locale) : c.createdAt ? formatDate(c.createdAt, locale) : ""}
                         </span>
                       </div>
-                      
+
                       {/* Metadata del token */}
                       {filteredMetadata.length > 0 ? (
                         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -308,14 +320,14 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
                                 {formatKey(key)}
                               </p>
                               <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
-                                {formatValue(value)}
+                                {formatValue(value, locale)}
                               </p>
                             </div>
                           ))}
                         </div>
                       ) : (
                         <p className="text-xs italic text-slate-400 dark:text-slate-500">
-                          Sin características adicionales
+                          {t("tokens.detail.noExtraMetadata")}
                         </p>
                       )}
                     </li>
@@ -348,12 +360,16 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
         `}</style>
         <div className={`sticky top-0 z-10 flex items-center justify-between border-b bg-gradient-to-r ${theme.gradient} px-6 py-4 text-white ${theme.containerBorder}`}>
           <h2 className="text-lg font-semibold">
-            {loading ? t("common.loading") : detail ? detail.name || `Token #${detail.id}` : `Token #${tokenId}`}
+            {loading
+              ? t("common.loading")
+              : detail
+                ? detail.name || t("dashboard.inventory.token", { id: detail.id })
+                : t("dashboard.inventory.token", { id: tokenId })}
           </h2>
           <button
             onClick={onClose}
             className="rounded-full p-2 transition hover:bg-white/20"
-            aria-label={t("nav.disconnect")}
+            aria-label={t("common.close")}
           >
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -380,7 +396,9 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
               <section>
                 <div className="rounded-2xl border border-surface bg-white p-5 shadow-sm cursor-default space-y-3">
                   <div>
-                    <p className="text-xl font-semibold text-slate-800 dark:text-slate-200">{detail.name || `Token #${detail.id}`}</p>
+                    <p className="text-xl font-semibold text-slate-800 dark:text-slate-200">
+                      {detail.name || t("dashboard.inventory.token", { id: detail.id })}
+                    </p>
                     <div className="mt-1">
                       <TokenTxHash tokenId={detail.id} chainId={31337} showFull={true} className="text-sm font-semibold text-slate-800 dark:text-slate-200" />
                     </div>
@@ -393,12 +411,12 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
 
               {/* Información básica: solo fecha de creación */}
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Información</h3>
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t("tokens.detail.section.info")}</h3>
                 <div className="grid gap-3">
                   <div className="rounded-2xl border border-surface bg-surface-2 p-4 cursor-default">
                     <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t("tokens.detail.creationDate")}</p>
                     <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
-                      {detail.createdAt ? formatDate(detail.createdAt) : "—"}
+                      {detail.createdAt ? formatDate(detail.createdAt, locale) : t("common.notAvailable")}
                     </p>
                   </div>
                 </div>
@@ -407,7 +425,7 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
               {/* Metadata predefinida por tipo */}
               {Object.keys(knownMetadata).length > 0 && (
                 <section className="space-y-3">
-                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Características del producto</h3>
+                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t("tokens.detail.section.features")}</h3>
                   <div className="grid gap-3 md:grid-cols-2">
                     {Object.entries(knownMetadata).map(([key, value]) => (
                       <div key={key} className="rounded-2xl border border-surface bg-surface-2 p-4 cursor-default">
@@ -422,7 +440,7 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
               {/* Metadata adicional (no predefinida) */}
               {Object.keys(unknownMetadata).length > 0 && (
                 <section className="space-y-3">
-                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Datos adicionales</h3>
+                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t("tokens.detail.section.metadata")}</h3>
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950 cursor-default">
                     <pre className="text-xs text-slate-700 dark:text-slate-300 overflow-x-auto">
                       {JSON.stringify(unknownMetadata, null, 2)}
@@ -441,9 +459,10 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
                 // 1) Minorista (arriba): solo si el creador es Retailer, sin componentes
                 if (creatorRole === "Retailer") {
                   blocks.push(
-                    <Stage key="r"
-                      title="Comerciado por"
-                      company={creatorInfo?.company}
+                    <Stage
+                      key="r"
+                      titleKey="tokens.detail.stage.retailer"
+                      company={creatorInfo?.company || undefined}
                       showComponents={false}
                     />
                   );
@@ -453,24 +472,25 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
                 if (creatorRole === "Factory") {
                   // Este token fue creado por una fábrica - mostrar sin componentes
                   blocks.push(
-                    <Stage key="f-self"
-                      title="Fabricado por"
-                      company={creatorInfo?.company}
+                    <Stage
+                      key="f-self"
+                      titleKey="tokens.detail.stage.factory"
+                      company={creatorInfo?.company || undefined}
                       showComponents={false}
                     />
                   );
                 } else if (creatorRole === "Retailer") {
                   // Cada token padre (role Factory) - mostrar empresa fabricante Y sus tokens con fechas
                   const factoryTokensMap = new Map<string, Array<{tokenId: number; name: string; amount: bigint; createdAt?: number}>>();
-                  
+
                   inputs.filter(p => p.creatorRole === "Factory").forEach((p) => {
-                    const company = p.creatorCompany || "Fábrica sin empresa";
+                    const company = p.creatorCompany || t("tokens.detail.stage.factoryUnknown");
                     if (!factoryTokensMap.has(company)) {
                       factoryTokensMap.set(company, []);
                     }
                     factoryTokensMap.get(company)!.push({
                       tokenId: p.tokenId,
-                      name: p.name || `Token ${p.tokenId}`,
+                      name: p.name || t("tokens.common.fallbackNameShort", { id: p.tokenId }),
                       amount: p.amount,
                       createdAt: p.createdAt
                     });
@@ -479,12 +499,13 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
                   // Crear un Stage por cada empresa fabricante con sus tokens
                   factoryTokensMap.forEach((tokens, company) => {
                     blocks.push(
-                      <Stage key={`f-${company}`}
-                        title="Fabricado por"
+                      <Stage
+                        key={`f-${company}`}
+                        titleKey="tokens.detail.stage.factory"
                         company={company}
                         inputs={tokens as any}
                         showComponents={true}
-                        componentLabel="Componentes realizados"
+                        componentLabelKey="tokens.detail.stage.componentsBuilt"
                       />
                     );
                   });
@@ -497,22 +518,23 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
                 if (creatorRole === "Producer") {
                   // Es productor directo - solo mostrar la empresa sin componentes
                   blocks.push(
-                    <Stage key="p-direct"
-                      title="Producido por"
-                      company={creatorInfo?.company}
+                    <Stage
+                      key="p-direct"
+                      titleKey="tokens.detail.stage.producer"
+                      company={creatorInfo?.company || undefined}
                       showComponents={false}
                     />
                   );
                 } else if (creatorRole === "Factory") {
                   // Los productores son los inputs directos - agrupar por empresa
                   inputs.filter(i => i.creatorRole === "Producer").forEach((i) => {
-                    const company = i.creatorCompany || "Sin empresa";
+                    const company = i.creatorCompany || t("tokens.detail.stage.producerUnknown");
                     if (!producersByCompany.has(company)) {
                       producersByCompany.set(company, []);
                     }
                     producersByCompany.get(company)!.push({
                       tokenId: i.tokenId,
-                      name: i.name || `Token ${i.tokenId}`,
+                      name: i.name || t("tokens.common.fallbackNameShort", { id: i.tokenId }),
                       amount: i.amount,
                       createdAt: i.createdAt
                     });
@@ -522,13 +544,13 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
                   inputs.forEach(p => {
                     const g = grandInputsByParent[p.tokenId] || [];
                     g.forEach((gi: any) => {
-                      const company = gi.creatorCompany || "Sin empresa";
+                      const company = gi.creatorCompany || t("tokens.detail.stage.producerUnknown");
                       if (!producersByCompany.has(company)) {
                         producersByCompany.set(company, []);
                       }
                       producersByCompany.get(company)!.push({
                         tokenId: gi.tokenId,
-                        name: gi.name || `Token ${gi.tokenId}`,
+                        name: gi.name || t("tokens.common.fallbackNameShort", { id: gi.tokenId }),
                         amount: gi.amount,
                         createdAt: gi.createdAt
                       });
@@ -539,12 +561,13 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
                 // Crear un Stage por cada empresa productora con sus tokens
                 producersByCompany.forEach((tokens, company) => {
                   blocks.push(
-                    <Stage key={`p-${company}`}
-                      title="Producido por"
+                    <Stage
+                      key={`p-${company}`}
+                      titleKey="tokens.detail.stage.producer"
                       company={company}
                       inputs={tokens as any}
                       showComponents={true}
-                      componentLabel="Componentes utilizados"
+                      componentLabelKey="tokens.detail.stage.componentsUsed"
                     />
                   );
                 });
@@ -575,7 +598,7 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
             onClick={onClose}
             className={`w-full rounded-full px-4 py-2 text-sm font-semibold transition ${theme.btnPrimary}`}
           >
-            Cerrar
+            {t("common.close")}
           </button>
         </div>
       </div>
