@@ -28,6 +28,7 @@ import { getErrorMessage } from "@/lib/errors";
 import { getCurrentContractAddress, resetProvider } from "@/lib/web3";
 import TokenDetailModal from "@/components/TokenDetailModal";
 import { getTokenDetail } from "@/lib/tokenDetail";
+import { TokenTxHash } from "@/components/TokenTxHash";
 // Helper: detect BlockOutOfRange and force full session cleanup
 function handleBlockOutOfRange(err: unknown) {
   const msg = (typeof err === "string" ? err : (err as any)?.message || "") as string;
@@ -506,7 +507,10 @@ export default function TransfersPage() {
                 <p className="text-left text-sm font-semibold text-slate-800 dark:text-slate-100">
                   #{row.tokenId} · {row.tokenName ?? `Token ${row.tokenId}`} · {row.amount}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{t("transfers.incoming.from", { address: `${row.fromDisplay ?? row.from}` })}</p>
+                <div className="mt-1">
+                  <TokenTxHash tokenId={row.tokenId} chainId={31337} />
+                </div>
+                <p className="text-xs mt-1 text-slate-500 dark:text-slate-400">{t("transfers.incoming.from", { address: `${row.fromDisplay ?? row.from}` })}</p>
                 <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
                   row.status === 1 
                     ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-300"
@@ -571,7 +575,10 @@ export default function TransfersPage() {
               <p className="text-left text-sm font-semibold text-slate-800 dark:text-slate-100">
                 #{row.tokenId} · {row.tokenName ?? `Token ${row.tokenId}`} · {row.amount}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t("transfers.outgoing.to", { address: `${row.toDisplay ?? row.to}` })}</p>
+              <div className="mt-1">
+                <TokenTxHash tokenId={row.tokenId} chainId={31337} />
+              </div>
+              <p className="text-xs mt-1 text-slate-500 dark:text-slate-400">{t("transfers.outgoing.to", { address: `${row.toDisplay ?? row.to}` })}</p>
               <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
                 row.status === 1 
                   ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-300"

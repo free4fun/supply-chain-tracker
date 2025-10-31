@@ -1,4 +1,4 @@
-type Token @entity {
+type Token @entity(immutable: false) {
   id: ID! # tokenId as string
   tokenId: BigInt!
   creator: Bytes!
@@ -24,14 +24,14 @@ type Token @entity {
   creatorRole: String
 }
 
-type TokenInput @entity {
+type TokenInput @entity(immutable: true) {
   id: ID! # tokenId-inputTokenId
   token: Token!
   inputTokenId: BigInt!
   amount: BigInt!
 }
 
-type Transfer @entity {
+type Transfer @entity(immutable: false) {
   id: ID! # transferId as string
   transferId: BigInt!
   from: Bytes!
@@ -48,7 +48,7 @@ type Transfer @entity {
   blockTimestamp: BigInt!
 }
 
-type User @entity {
+type User @entity(immutable: false) {
   id: ID! # address
   address: Bytes!
   role: String!
@@ -57,8 +57,8 @@ type User @entity {
   firstName: String!
   lastName: String!
   
-  # Stats
-  tokensCreated: [Token!]! @derivedFrom(field: "creator")
-  transfersFrom: [Transfer!]! @derivedFrom(field: "from")
-  transfersTo: [Transfer!]! @derivedFrom(field: "to")
+  # Stats (counts only, since @derivedFrom doesn't work with Bytes fields)
+  tokensCreatedCount: BigInt!
+  transfersFromCount: BigInt!
+  transfersToCount: BigInt!
 }

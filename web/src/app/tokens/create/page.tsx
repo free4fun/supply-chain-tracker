@@ -22,6 +22,7 @@ import { getErrorMessage } from "@/lib/errors";
 import TokenDetailModal from "@/components/TokenDetailModal";
 import { getTokenDetail } from "@/lib/tokenDetail";
 import { resetProvider } from "@/lib/web3";
+import { TokenTxHash } from "@/components/TokenTxHash";
 function handleBlockOutOfRange(err: unknown) {
   const msg = (typeof err === "string" ? err : (err as any)?.message || "") as string;
   if (/BlockOutOfRange|block height|eth_call/i.test(msg)) {
@@ -749,6 +750,9 @@ export default function CreateTokenPage() {
                       >
                         <div className="flex items-center justify-between">
                           <p className="font-semibold">Resumen del token #{row.tokenId}</p>
+                        </div>
+                        <div className="mt-1">
+                          <TokenTxHash tokenId={row.tokenId} chainId={31337} />
                         </div>
                         {(() => {
                           const item = availableInventory.find(i => i.id === row.tokenId);

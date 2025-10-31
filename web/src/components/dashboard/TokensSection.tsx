@@ -4,6 +4,7 @@ import { useRoleTheme } from "@/hooks/useRoleTheme";
 import React, { useState } from "react";
 import TokenDetailModal from "@/components/TokenDetailModal";
 import { getTokenDetail } from "@/lib/tokenDetail";
+import { TokenTxHash } from "@/components/TokenTxHash";
 
 export default function TokensSection({
   t,
@@ -36,7 +37,10 @@ export default function TokensSection({
         >
           <div>
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">#{id} · {names[id] ?? `Token ${id}`}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{t("dashboard.inventory.balanceLabel")}</p>
+            <div className="mt-1">
+              <TokenTxHash tokenId={id} chainId={31337} />
+            </div>
+            <p className="text-xs mt-1 text-slate-500 dark:text-slate-400">{t("dashboard.inventory.balanceLabel")}</p>
           </div>
           <span className="text-lg font-semibold text-accent dark:text-indigo-300">{balances[id] ?? "…"}</span>
         </div>

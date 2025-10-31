@@ -5,13 +5,14 @@ interface TokenTxHashProps {
   tokenId: number;
   chainId?: number;
   showFull?: boolean;
+  variant?: 'default' | 'light'; // Para header con fondo oscuro
 }
 
 /**
  * Componente para mostrar el transaction hash de un token
  * Consulta automáticamente el subgraph y muestra el hash con link al explorer
  */
-export function TokenTxHash({ tokenId, chainId = 31337, showFull = false }: TokenTxHashProps) {
+export function TokenTxHash({ tokenId, chainId = 31337, showFull = false, variant = 'default' }: TokenTxHashProps) {
   const [txHash, setTxHash] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
 
@@ -35,9 +36,11 @@ export function TokenTxHash({ tokenId, chainId = 31337, showFull = false }: Toke
       .finally(() => setLoading(false));
   }, [tokenId]);
 
+  const isLight = variant === 'light';
+  
   if (loading) {
     return (
-      <span className="text-xs text-slate-400 animate-pulse">
+      <span className={`text-xs animate-pulse ${isLight ? 'text-white/60' : 'text-slate-400'}`}>
         Cargando hash...
       </span>
     );
@@ -45,7 +48,7 @@ export function TokenTxHash({ tokenId, chainId = 31337, showFull = false }: Toke
 
   if (!txHash) {
     return (
-      <span className="text-xs text-slate-400 italic">
+      <span className={`text-xs italic ${isLight ? 'text-white/50' : 'text-slate-400'}`}>
         Hash no disponible
       </span>
     );
@@ -56,7 +59,7 @@ export function TokenTxHash({ tokenId, chainId = 31337, showFull = false }: Toke
 
   return (
     <div className="inline-flex items-center gap-2">
-      <span className="text-xs font-mono text-slate-600 dark:text-slate-400">
+      <span className={`text-xs font-mono ${isLight ? 'text-white/90' : 'text-slate-600 dark:text-slate-400'}`}>
         {displayHash}
       </span>
       {chainId !== 31337 && (
@@ -64,7 +67,9 @@ export function TokenTxHash({ tokenId, chainId = 31337, showFull = false }: Toke
           href={explorerUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+          className={`text-xs hover:opacity-80 transition-opacity ${
+            isLight ? 'text-white' : 'text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300'
+          }`}
           title="Ver en block explorer"
         >
           <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

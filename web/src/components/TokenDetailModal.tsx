@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { getTokenInputs, getTokenView, getUserInfo, getUserTransfers, getTransfer } from "@/lib/sc";
 import { handleBlockOutOfRange } from "@/lib/blockOutOfRange";
 import { useRole } from "@/contexts/RoleContext";
+import { TokenTxHash } from "@/components/TokenTxHash";
 
 type TokenDetailModalProps = {
   tokenId: number | null;
@@ -341,11 +342,17 @@ export default function TokenDetailModal({ tokenId, onClose, fetchDetail }: Toke
             scrollbar-width: none;
           }
         `}</style>
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-surface bg-gradient-to-r from-indigo-600 to-sky-500 px-6 py-3 text-white">
-          <div>
-            <h2 className="text-sm font-medium tracking-wide opacity-90">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-surface bg-gradient-to-r from-indigo-600 to-sky-500 px-6 py-4 text-white">
+          <div className="flex-1">
+            <h2 className="text-sm font-medium tracking-wide opacity-90 mb-1">
               {loading ? "Cargando…" : detail ? `Token #${detail.id}` : `Token #${tokenId}`}
             </h2>
+            {!loading && tokenId && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white/70">Hash:</span>
+                <TokenTxHash tokenId={tokenId} chainId={31337} variant="light" />
+              </div>
+            )}
           </div>
           <button
             onClick={onClose}

@@ -6,12 +6,13 @@
     "build": "graph build",
     "create-local": "graph create --node http://localhost:8020/ supply-chain-tracker",
     "remove-local": "graph remove --node http://localhost:8020/ supply-chain-tracker",
-    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 supply-chain-tracker",
-    "deploy-testnet": "graph deploy --studio supply-chain-tracker",
-    "auth": "graph auth --studio"
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 supply-chain-tracker --version-label v0.0.1",
+    "deploy-testnet": "graph deploy --studio supply-chain-tracker --version-label v0.0.1",
+    "auth": "graph auth --studio",
+    "deploy": "./deploy.sh"
   },
   "dependencies": {
-    "@graphprotocol/graph-cli": "^0.67.4",
-    "@graphprotocol/graph-ts": "^0.32.0"
+    "@graphprotocol/graph-cli": "^0.98.1",
+    "@graphprotocol/graph-ts": "^0.38.2"
   }
 }

@@ -16,6 +16,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useRoleTheme } from "@/hooks/useRoleTheme";
 import { resetProvider } from "@/lib/web3";
 import TokenDetailModal from "@/components/TokenDetailModal";
+import { TokenTxHash } from "@/components/TokenTxHash";
 // Helper: detect BlockOutOfRange and force full session cleanup
 function handleBlockOutOfRange(err: unknown) {
   const msg = (typeof err === "string" ? err : (err as any)?.message || "") as string;
@@ -349,7 +350,10 @@ export default function TokensPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-semibold">#{token.id} · {token.name}</p>
-                          <p className={`text-xs ${isActive ? "text-white/80" : "text-slate-500"}`}>
+                          <div className="mt-1">
+                            <TokenTxHash tokenId={token.id} chainId={31337} />
+                          </div>
+                          <p className={`text-xs mt-1 ${isActive ? "text-white/80" : "text-slate-500"}`}>
                             {token.description || "Sin descripción"}
                           </p>
                         </div>

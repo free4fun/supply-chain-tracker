@@ -10,10 +10,9 @@ dataSources:
     source:
       # Para local: dirección del contrato desplegado
       # Para testnet: actualizar con la dirección en testnet
-      address: "0x5FbDB2315678afecb367f032d93F642f64180aa3" # ACTUALIZAR con tu dirección
+      address: "0x52e153636aeee4ea16f6c968e392df969b7081c1"
       abi: SupplyChain
-      # Para testnet, agregar startBlock para indexar más rápido:
-      # startBlock: 12345678
+      startBlock: 0  # Indexar desde el bloque 0 para capturar eventos históricos
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -27,9 +26,9 @@ dataSources:
         - name: SupplyChain
           file: ./abis/SupplyChain.json
       eventHandlers:
-        - event: TokenCreated(indexed uint256,indexed address,uint256)
+        - event: TokenCreated(indexed uint256,indexed address,string,string,uint256,string,uint256)
           handler: handleTokenCreated
-        - event: TransferInitiated(indexed uint256,indexed address,indexed address,uint256,uint256)
+        - event: TransferRequested(indexed uint256,indexed address,indexed address,uint256,uint256)
           handler: handleTransferInitiated
         - event: TransferAccepted(indexed uint256)
           handler: handleTransferAccepted
@@ -37,6 +36,6 @@ dataSources:
           handler: handleTransferRejected
         - event: TransferCancelled(indexed uint256)
           handler: handleTransferCancelled
-        - event: UserRegistered(indexed address,string)
+        - event: UserRoleRequested(indexed address,string)
           handler: handleUserRegistered
       file: ./src/mapping.ts

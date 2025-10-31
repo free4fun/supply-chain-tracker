@@ -26,9 +26,9 @@ dataSources:
         - name: SupplyChain
           file: ./abis/SupplyChain.json
       eventHandlers:
-        - event: TokenCreated(indexed uint256,indexed address,uint256)
+        - event: TokenCreated(indexed uint256,indexed address,string,string,uint256,string,uint256)
           handler: handleTokenCreated
-        - event: TransferInitiated(indexed uint256,indexed address,indexed address,uint256,uint256)
+        - event: TransferRequested(indexed uint256,indexed address,indexed address,uint256,uint256)
           handler: handleTransferInitiated
         - event: TransferAccepted(indexed uint256)
           handler: handleTransferAccepted
@@ -36,6 +36,6 @@ dataSources:
           handler: handleTransferRejected
         - event: TransferCancelled(indexed uint256)
           handler: handleTransferCancelled
-        - event: UserRegistered(indexed address,string)
+        - event: UserRoleRequested(indexed address,string)
           handler: handleUserRegistered
       file: ./src/mapping.ts

@@ -145,6 +145,16 @@ NEXT_PUBLIC_CONTRACT_ADDRESS=$ADDR
 NEXT_PUBLIC_ADMIN_ADDRESS=$ADMIN
 EOF
 
+# Update subgraph contract address
+SUBGRAPH_YAML="$root_dir/subgraph/subgraph.yaml"
+if [[ -f "$SUBGRAPH_YAML" ]]; then
+  echo "[deploy] Updating subgraph contract address..."
+  # Use sed to replace the address line in subgraph.yaml
+  sed -i.bak "s/address: \"0x[a-fA-F0-9]*\"/address: \"$ADDR\"/" "$SUBGRAPH_YAML"
+  rm -f "$SUBGRAPH_YAML.bak"
+  echo "[deploy] Subgraph config updated with address: $ADDR"
+fi
+
 echo "[deploy] SupplyChain: $ADDR"
 echo "[deploy] Admin:       $ADMIN"
 echo "[deploy] ABI:         web/src/contracts/SupplyChain.abi.json"
