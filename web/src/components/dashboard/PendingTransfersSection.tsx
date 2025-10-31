@@ -55,15 +55,21 @@ export default function PendingTransfersSection({
                   <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${tr.direction === 'in' ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-300' : 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950 dark:text-indigo-300'}`}>
                     {tr.direction === 'in' ? t('dashboard.activity.in') : t('dashboard.activity.out')}
                   </span>
-                  <p className="font-semibold">#{tr.tokenId} · {tr.tokenName ?? "Token"} · {tr.amount.toString()}</p>
+                  <p className="font-semibold">
+                    {t("dashboard.activity.summary", {
+                      id: tr.tokenId,
+                      name: tr.tokenName ?? t("tokens.common.fallbackNameShort", { id: tr.tokenId }),
+                      amount: tr.amount.toString(),
+                    })}
+                  </p>
                 </div>
                 <div className="mb-2">
                   <TokenTxHash tokenId={tr.tokenId} chainId={31337} showFull={true} className="text-xs text-slate-700 dark:text-slate-300" />
                 </div>
               {tr.direction === 'in' ? (
-                <p className="text-xs text-slate-500">Desde: {tr.from}</p>
+                <p className="text-xs text-slate-500">{t("dashboard.pendingTransfers.from", { from: tr.from })}</p>
               ) : (
-                <p className="text-xs text-slate-500">Hacia: {tr.to}</p>
+                <p className="text-xs text-slate-500">{t("dashboard.pendingTransfers.to", { to: tr.to })}</p>
               )}
               {tr.direction === 'in' ? (
                 <div className="grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>

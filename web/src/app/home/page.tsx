@@ -103,7 +103,10 @@ function RoleWorkflowSection({
   const lastRequestedRoleLabel = lastRequestedRole ? t(`roles.${lastRequestedRole}`) : undefined;
 
   return (
-  <section className="grid gap-6 rounded-[24px] border border-surface bg-surface-1 p-8 shadow-[0_14px_45px_-32px_rgba(15,23,42,0.65)] backdrop-blur-md">
+    <section
+      id="role-workflow"
+      className="grid gap-6 rounded-[24px] border border-surface bg-surface-1 p-8 shadow-[0_14px_45px_-32px_rgba(15,23,42,0.65)] backdrop-blur-md"
+    >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-2">
           <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{t("landing.workflow.title")}</h2>
@@ -327,6 +330,57 @@ export default function Page() {
         </div>
       </section>
 
+      <section className="grid gap-8 rounded-[24px] border border-surface bg-surface-1 p-8 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.6)] backdrop-blur-md md:grid-cols-[1.2fr,1fr] md:p-12">
+        <div className="space-y-6 text-slate-900 dark:text-slate-100">
+          <div className="space-y-3">
+            <h2 className="text-2xl font-semibold md:text-3xl">{t("landing.story.title")}</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 md:text-base">{t("landing.story.subtitle")}</p>
+          </div>
+          <ul className="grid gap-3 text-sm text-slate-600 dark:text-slate-300">
+            {["landing.story.points.1", "landing.story.points.2", "landing.story.points.3"].map(pointKey => (
+              <li
+                key={pointKey}
+                className="flex items-start gap-3 rounded-2xl border border-surface bg-surface-2 p-4 shadow-sm"
+              >
+                <span className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500/10 text-xs font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200">
+                  ✦
+                </span>
+                <span>{t(pointKey)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="space-y-4">
+          <div className="grid gap-4 rounded-3xl border border-surface bg-surface-2 p-6 shadow-inner">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">{t("landing.metrics.title")}</p>
+              <p className="text-sm text-slate-600 dark:text-slate-300">{t("landing.metrics.subtitle")}</p>
+            </div>
+            <div className="grid gap-3">
+              {["visibility", "onboarding", "roles"].map(item => (
+                <div
+                  key={item}
+                  className="rounded-2xl border border-surface bg-surface-3/60 p-4 shadow-sm"
+                >
+                  <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-300">{t(`landing.metrics.${item}.value`)}</p>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t(`landing.metrics.${item}.label`)}</p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t(`landing.metrics.${item}.description`)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-indigo-200/60 bg-indigo-500/10 p-6 text-sm text-slate-800 shadow-[0_16px_46px_-28px_rgba(79,70,229,0.55)] dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-50">
+            <p className="italic text-slate-700 dark:text-indigo-100">“{t("landing.story.testimonial.quote")}”</p>
+            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-indigo-600 dark:text-indigo-200">
+              {t("landing.story.testimonial.author")}
+            </div>
+            <p className="text-xs text-slate-500 dark:text-indigo-200/80">{t("landing.story.testimonial.role")}</p>
+          </div>
+        </div>
+      </section>
+
       <RoleWorkflowSection
         key={workflowKey}
         initialRole={initialWorkflowRole}
@@ -366,6 +420,28 @@ export default function Page() {
               <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">{t(feature.descriptionKey)}</p>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="grid gap-6 rounded-[24px] border border-surface bg-gradient-to-br from-indigo-600/10 via-sky-500/10 to-transparent p-8 shadow-[0_18px_60px_-40px_rgba(37,99,235,0.55)] backdrop-blur-md md:grid-cols-[1.2fr,1fr] md:p-12">
+        <div className="space-y-4 text-slate-900 dark:text-slate-100">
+          <h2 className="text-2xl font-semibold md:text-3xl">{t("landing.cta.title")}</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-300 md:text-base">{t("landing.cta.subtitle")}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 md:justify-end">
+          <button
+            onClick={reconnect}
+            className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+            disabled={!ready}
+          >
+            {t("landing.cta.primary")}
+          </button>
+          <a
+            href="#role-workflow"
+            className="rounded-full border border-surface px-6 py-3 text-sm font-semibold text-slate-800 transition hover:border-indigo-400 hover:text-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:text-slate-200"
+          >
+            {t("landing.cta.secondary")}
+          </a>
         </div>
       </section>
     </main>
