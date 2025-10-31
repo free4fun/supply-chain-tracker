@@ -32,6 +32,8 @@ export default function ProfilePage() {
   const [company, setCompany] = useState<string>(companySnap || "");
   const [firstName, setFirstName] = useState<string>(firstNameSnap || "");
   const [lastName, setLastName] = useState<string>(lastNameSnap || "");
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
+  const [lastTxAction, setLastTxAction] = useState<string | null>(null);
 
   const { push } = useToast();
   // Expecting these from Web3Context; if not present, only `account` is used.
@@ -73,9 +75,13 @@ export default function ProfilePage() {
             setPending(false);
             return;
           }
-          await registerAndRequestRole(company, firstName, lastName, parsed.data.role);
+          const result = await registerAndRequestRole(company, firstName, lastName, parsed.data.role);
+          setLastTxHash(result.txHash);
+          setLastTxAction(`Registro completado y rol ${parsed.data.role} solicitado`);
         } else {
-          await requestUserRole(parsed.data.role);
+          const result = await requestUserRole(parsed.data.role);
+          setLastTxHash(result.txHash);
+          setLastTxAction(`Rol ${parsed.data.role} solicitado`);
         }
       } catch (innerErr: unknown) {
         // If we get NoUser error, it means we need to use registerAndRequestRole
@@ -86,7 +92,9 @@ export default function ProfilePage() {
             setPending(false);
             return;
           }
-          await registerAndRequestRole(company, firstName, lastName, parsed.data.role);
+          const result = await registerAndRequestRole(company, firstName, lastName, parsed.data.role);
+          setLastTxHash(result.txHash);
+          setLastTxAction(`Registro completado y rol ${parsed.data.role} solicitado`);
         } else {
           throw innerErr;
         }
@@ -123,7 +131,9 @@ export default function ProfilePage() {
     }
     try {
       setPending(true);
-      await updateUserProfile(company, firstName, lastName);
+      const result = await updateUserProfile(company, firstName, lastName);
+      setLastTxHash(result.txHash);
+      setLastTxAction("Perfil actualizado");
       push(ToastKind.Success, t("profile.profile.saved"));
       await refresh();
     } catch (err: unknown) {
@@ -148,7 +158,9 @@ export default function ProfilePage() {
     }
     try {
       setPending(true);
-      await cancelRoleRequest();
+      const result = await cancelRoleRequest();
+      setLastTxHash(result.txHash);
+      setLastTxAction("Solicitud de rol cancelada");
       push(ToastKind.Success, t("profile.toast.cancelSuccess"));
       await refresh();
     } catch (err: unknown) {
@@ -195,6 +207,34 @@ export default function ProfilePage() {
           </div>
         </div>
       </header>
+
+      {lastTxHash && lastTxAction && (
+        <section className="rounded-3xl border border-emerald-200 bg-emerald-50/80 dark:bg-emerald-900/20 dark:border-emerald-700 p-5 shadow-lg">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">✅</span>
+            <div className="flex-1 space-y-2">
+              <h3 className="text-lg font-semibold text-emerald-900 dark:text-emerald-100">
+                {lastTxAction}
+              </h3>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Hash de transacción:</p>
+                <code className="block rounded-lg bg-emerald-100 dark:bg-emerald-900/40 px-3 py-2 text-xs font-mono text-emerald-900 dark:text-emerald-100 break-all">
+                  {lastTxHash}
+                </code>
+              </div>
+              <button
+                onClick={() => {
+                  setLastTxHash(null);
+                  setLastTxAction(null);
+                }}
+                className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-100 underline"
+              >
+                Cerrar mensaje
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
   <section className={`space-y-3 rounded-3xl border bg-white dark:bg-slate-900 p-6 shadow-inner ${theme.containerBorder}`}>
         <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 cursor-default">{t("profile.status.heading")}</h2>

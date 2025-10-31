@@ -29,38 +29,43 @@ export async function getUserInfo(addr: string) {
   return sc.getUserInfo(addr, CALL_OPTS);
 }
 
-export async function requestUserRole(role: string): Promise<void> {
+export async function requestUserRole(role: string): Promise<{ txHash: string }> {
   if (!role) throw new Error("Role required");
   const sc = await getContract(true);
   const tx = await sc.requestUserRole(role);
   await tx.wait();
+  return { txHash: tx.hash };
 }
 
-export async function registerAndRequestRole(company: string, firstName: string, lastName: string, role: string): Promise<void> {
+export async function registerAndRequestRole(company: string, firstName: string, lastName: string, role: string): Promise<{ txHash: string }> {
   if (!company || !firstName || !lastName) throw new Error("Profile required");
   if (!role) throw new Error("Role required");
   const sc = await getContract(true);
   const tx = await sc.registerAndRequestRole(company, firstName, lastName, role);
   await tx.wait();
+  return { txHash: tx.hash };
 }
 
-export async function changeStatusUser(addr: string, newStatus: number): Promise<void> {
+export async function changeStatusUser(addr: string, newStatus: number): Promise<{ txHash: string }> {
   const sc = await getContract(true);
   const tx = await sc.changeStatusUser(addr, newStatus);
   await tx.wait();
+  return { txHash: tx.hash };
 }
 
-export async function cancelRoleRequest(): Promise<void> {
+export async function cancelRoleRequest(): Promise<{ txHash: string }> {
   const sc = await getContract(true);
   const tx = await sc.cancelRoleRequest();
   await tx.wait();
+  return { txHash: tx.hash };
 }
 
-export async function updateUserProfile(company: string, firstName: string, lastName: string): Promise<void> {
+export async function updateUserProfile(company: string, firstName: string, lastName: string): Promise<{ txHash: string }> {
   if (!company || !firstName || !lastName) throw new Error("Profile required");
   const sc = await getContract(true);
   const tx = await sc.updateUserProfile(company, firstName, lastName);
   await tx.wait();
+  return { txHash: tx.hash };
 }
 
 export type ComponentInput = { tokenId: bigint; amount: bigint };
@@ -71,14 +76,34 @@ export async function createToken(
   totalSupply: bigint,
   features: string,
   components: ComponentInput[]
-): Promise<void> {
+): Promise<{ txHash: string; tokenId: number }> {
   if (!name) throw new Error("Name required");
   if (totalSupply <= BigInt(0)) throw new Error("Supply must be > 0"); // <- sin 0n
   const sc = await getContract(true);
   const ids = components.map(component => component.tokenId);
   const amounts = components.map(component => component.amount);
   const tx = await sc.createToken(name, description, totalSupply, features, ids, amounts);
-  await tx.wait();
+  const receipt = await tx.wait();
+  
+  // Extract tokenId from TokenCreated event
+  const tokenCreatedEvent = receipt?.logs?.find((log: any) => {
+    try {
+      const parsed = sc.interface.parseLog(log);
+      return parsed?.name === "TokenCreated";
+    } catch {
+      return false;
+    }
+  });
+  
+  let tokenId = 0;
+  if (tokenCreatedEvent) {
+    try {
+      const parsed = sc.interface.parseLog(tokenCreatedEvent);
+      tokenId = Number(parsed?.args?.[0] ?? 0);
+    } catch {}
+  }
+  
+  return { txHash: tx.hash, tokenId };
 }
 
 export async function getTokenView(id: number) {
@@ -108,28 +133,51 @@ export async function getSuggestedParent(addr: string) {
   return sc.getSuggestedParent(addr, CALL_OPTS);
 }
 
-export async function transfer(to: string, tokenId: bigint, amount: bigint) {
+export async function transfer(to: string, tokenId: bigint, amount: bigint): Promise<{ txHash: string; transferId?: number }> {
   const sc = await getContract(true);
   const tx = await sc.transfer(to, tokenId, amount);
-  await tx.wait();
+  const receipt = await tx.wait();
+  
+  // Extract transferId from TransferCreated event
+  const transferCreatedEvent = receipt?.logs?.find((log: any) => {
+    try {
+      const parsed = sc.interface.parseLog(log);
+      return parsed?.name === "TransferCreated";
+    } catch {
+      return false;
+    }
+  });
+  
+  let transferId: number | undefined;
+  if (transferCreatedEvent) {
+    try {
+      const parsed = sc.interface.parseLog(transferCreatedEvent);
+      transferId = Number(parsed?.args?.[0] ?? 0);
+    } catch {}
+  }
+  
+  return { txHash: tx.hash, transferId };
 }
 
-export async function acceptTransfer(id: bigint) {
+export async function acceptTransfer(id: bigint): Promise<{ txHash: string }> {
   const sc = await getContract(true);
   const tx = await sc.acceptTransfer(id);
   await tx.wait();
+  return { txHash: tx.hash };
 }
 
-export async function rejectTransfer(id: bigint) {
+export async function rejectTransfer(id: bigint): Promise<{ txHash: string }> {
   const sc = await getContract(true);
   const tx = await sc.rejectTransfer(id);
   await tx.wait();
+  return { txHash: tx.hash };
 }
 
-export async function cancelTransfer(id: bigint) {
+export async function cancelTransfer(id: bigint): Promise<{ txHash: string }> {
   const sc = await getContract(true);
   const tx = await sc.cancelTransfer(id);
   await tx.wait();
+  return { txHash: tx.hash };
 }
 
 export async function getTransfer(id: number) {

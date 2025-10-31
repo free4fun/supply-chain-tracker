@@ -214,6 +214,8 @@ export default function CreateTokenPage() {
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [pendingOutgoingByToken, setPendingOutgoingByToken] = useState<Record<number, bigint>>({});
   const [modalTokenId, setModalTokenId] = useState<number | null>(null);
+  const [lastCreatedTxHash, setLastCreatedTxHash] = useState<string | null>(null);
+  const [lastCreatedTokenId, setLastCreatedTokenId] = useState<number | null>(null);
 
   const { push } = useToast();
   const { account } = useWeb3();
@@ -507,7 +509,13 @@ export default function CreateTokenPage() {
 
       try {
         setPending(true);
-        await createToken(name.trim(), description.trim(), totalSupply, metadataPayload || "{}", components);
+        const result = await createToken(name.trim(), description.trim(), totalSupply, metadataPayload || "{}", components);
+        setLastCreatedTxHash(result.txHash);
+        setLastCreatedTokenId(result.tokenId);
+        // Guardar en localStorage para que TokenTxHash pueda encontrarlo
+        if (result.tokenId && result.txHash) {
+          localStorage.setItem(`tx_hash_${result.tokenId}`, result.txHash);
+        }
         push("success", "Token creado y trazabilidad actualizada");
         setName("");
         setDescription("");
@@ -590,6 +598,34 @@ export default function CreateTokenPage() {
           </div>
         </div>
       </header>
+
+            {lastCreatedTxHash && lastCreatedTokenId !== null && (
+        <section className="rounded-3xl border border-emerald-200 bg-emerald-50/80 dark:bg-emerald-900/20 dark:border-emerald-700 p-5 shadow-lg">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">✅</span>
+            <div className="flex-1 space-y-2">
+              <h3 className="text-lg font-semibold text-emerald-900 dark:text-emerald-100">
+                Token #{lastCreatedTokenId} creado exitosamente
+              </h3>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Hash de transacción:</p>
+                <code className="block rounded-lg bg-emerald-100 dark:bg-emerald-900/40 px-3 py-2 text-xs font-mono text-emerald-900 dark:text-emerald-100 break-all">
+                  {lastCreatedTxHash}
+                </code>
+              </div>
+              <button
+                onClick={() => {
+                  setLastCreatedTxHash(null);
+                  setLastCreatedTokenId(null);
+                }}
+                className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-100 underline"
+              >
+                Cerrar mensaje
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <section className={`rounded-3xl border ${theme.containerBorder} bg-white dark:bg-slate-900 p-5 shadow-inner`}>

@@ -92,6 +92,8 @@ export default function TransfersPage() {
   const [loadingTokens, setLoadingTokens] = useState(false);
   const [availableByToken, setAvailableByToken] = useState<Record<number, bigint>>({});
   const [modalTokenId, setModalTokenId] = useState<number | null>(null);
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
+  const [lastTxAction, setLastTxAction] = useState<string | null>(null);
 
   const nextRole = activeRole ? NEXT_ROLE[activeRole] : undefined;
   const canCreate = Boolean(activeRole && ["Producer", "Factory", "Retailer"].includes(activeRole));
@@ -367,7 +369,9 @@ export default function TransfersPage() {
           return;
         }
       } catch {}
-      await transfer(parsed.data.recipient, BigInt(parsed.data.tokenId), parsed.data.amount);
+      const result = await transfer(parsed.data.recipient, BigInt(parsed.data.tokenId), parsed.data.amount);
+      setLastTxHash(result.txHash);
+      setLastTxAction(result.transferId ? `Transferencia #${result.transferId} creada` : "Transferencia creada");
       push("success", t("transfers.success.created"));
       await refreshTransfers();
       await refreshTokens({ silent: true });
@@ -415,6 +419,34 @@ export default function TransfersPage() {
           </button>
         </div>
       </header>
+
+      {lastTxHash && lastTxAction && (
+        <section className="rounded-3xl border border-emerald-200 bg-emerald-50/80 dark:bg-emerald-900/20 dark:border-emerald-700 p-5 shadow-lg">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">✅</span>
+            <div className="flex-1 space-y-2">
+              <h3 className="text-lg font-semibold text-emerald-900 dark:text-emerald-100">
+                {lastTxAction}
+              </h3>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Hash de transacción:</p>
+                <code className="block rounded-lg bg-emerald-100 dark:bg-emerald-900/40 px-3 py-2 text-xs font-mono text-emerald-900 dark:text-emerald-100 break-all">
+                  {lastTxHash}
+                </code>
+              </div>
+              <button
+                onClick={() => {
+                  setLastTxHash(null);
+                  setLastTxAction(null);
+                }}
+                className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-100 underline"
+              >
+                Cerrar mensaje
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
   <section className={`space-y-4 rounded-3xl border bg-white dark:bg-slate-900 p-6 shadow-inner ${theme.containerBorder}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t("transfers.title")}</h2>
@@ -542,7 +574,9 @@ export default function TransfersPage() {
                     className="rounded-full border border-emerald-400 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60 dark:text-emerald-300"
                     onClick={async () => {
                       try {
-                        await acceptTransfer(BigInt(row.id));
+                        const result = await acceptTransfer(BigInt(row.id));
+                        setLastTxHash(result.txHash);
+                        setLastTxAction(`Transferencia #${row.id} aceptada`);
                         push("success", t("transfers.success.accepted"));
                         await refreshTransfers();
                       } catch (err: unknown) {
@@ -558,7 +592,9 @@ export default function TransfersPage() {
                     className="rounded-full border border-rose-400 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60 dark:text-rose-300"
                     onClick={async () => {
                       try {
-                        await rejectTransfer(BigInt(row.id));
+                        const result = await rejectTransfer(BigInt(row.id));
+                        setLastTxHash(result.txHash);
+                        setLastTxAction(`Transferencia #${row.id} rechazada`);
                         push("success", t("transfers.success.rejected"));
                         await refreshTransfers();
                       } catch (err: unknown) {
@@ -643,7 +679,9 @@ export default function TransfersPage() {
                           }
                           // Otherwise, continue to attempt and handle below
                         }
-                        await cancelTransfer(BigInt(row.id));
+                        const result = await cancelTransfer(BigInt(row.id));
+                        setLastTxHash(result.txHash);
+                        setLastTxAction(`Transferencia #${row.id} cancelada`);
                         push("success", t("transfers.success.cancelled"));
                         await refreshTransfers();
                         await refreshTokens({ silent: true });

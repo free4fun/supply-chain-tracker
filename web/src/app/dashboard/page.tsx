@@ -48,6 +48,8 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [timelineCounts, setTimelineCounts] = useState<number[]>([]);
   const [timelineMode, setTimelineMode] = useState<"count" | "volume">("count");
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
+  const [lastTxAction, setLastTxAction] = useState<string | null>(null);
 
   // Helper: detect BlockOutOfRange and force full session cleanup
   function handleBlockOutOfRange(err: unknown) {
@@ -472,7 +474,9 @@ export default function Dashboard() {
   const handleAccept = useCallback(async (id: number) => {
     setTxBusy(prev => ({ ...prev, [id]: true }));
     try {
-      await acceptTransfer(BigInt(id));
+      const result = await acceptTransfer(BigInt(id));
+      setLastTxHash(result.txHash);
+      setLastTxAction(`Transferencia #${id} aceptada`);
       // Optimistic update then full refresh of all on-chain sections
       setPendingTransfers(prev => prev.filter(t => t.id !== id));
       await refreshAll();
@@ -487,7 +491,9 @@ export default function Dashboard() {
   const handleReject = useCallback(async (id: number) => {
     setTxBusy(prev => ({ ...prev, [id]: true }));
     try {
-      await rejectTransfer(BigInt(id));
+      const result = await rejectTransfer(BigInt(id));
+      setLastTxHash(result.txHash);
+      setLastTxAction(`Transferencia #${id} rechazada`);
       setPendingTransfers(prev => prev.filter(t => t.id !== id));
       await refreshAll();
     } catch (err) {
@@ -544,6 +550,34 @@ export default function Dashboard() {
             </button>
         </div>
       </header>
+
+      {lastTxHash && lastTxAction && (
+        <section className="rounded-3xl border border-emerald-200 bg-emerald-50/80 dark:bg-emerald-900/20 dark:border-emerald-700 p-5 shadow-lg">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">✅</span>
+            <div className="flex-1 space-y-2">
+              <h3 className="text-lg font-semibold text-emerald-900 dark:text-emerald-100">
+                {lastTxAction}
+              </h3>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Hash de transacción:</p>
+                <code className="block rounded-lg bg-emerald-100 dark:bg-emerald-900/40 px-3 py-2 text-xs font-mono text-emerald-900 dark:text-emerald-100 break-all">
+                  {lastTxHash}
+                </code>
+              </div>
+              <button
+                onClick={() => {
+                  setLastTxHash(null);
+                  setLastTxAction(null);
+                }}
+                className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-100 underline"
+              >
+                Cerrar mensaje
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Columna izquierda: apilado vertical */}
