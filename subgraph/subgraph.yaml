@@ -6,13 +6,13 @@ schema:
 dataSources:
   - kind: ethereum
     name: SupplyChain
-    network: localhost # Cambiar a 'sepolia' para testnet
+    network: sepolia # Network para testnet
     source:
-      # Para local: dirección del contrato desplegado
-      # Para testnet: actualizar con la dirección en testnet
-      address: "0x52e153636aeee4ea16f6c968e392df969b7081c1"
+      # ACTUALIZAR con la dirección del contrato en Sepolia
+      address: "0xc9f05d6d9752c858c59e31c7d96799261d8841fe"
       abi: SupplyChain
-      startBlock: 0  # Indexar desde el bloque 0 para capturar eventos históricos
+      # ACTUALIZAR con el bloque donde se desplegó el contrato
+      startBlock: 0
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

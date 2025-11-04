@@ -7,8 +7,8 @@
     "create-local": "graph create --node http://localhost:8020/ supply-chain-tracker",
     "remove-local": "graph remove --node http://localhost:8020/ supply-chain-tracker",
     "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 supply-chain-tracker --version-label v0.0.1",
-    "deploy-testnet": "graph deploy --studio supply-chain-tracker --version-label v0.0.1",
-    "auth": "graph auth --studio",
+    "deploy-testnet": "graph deploy supply-chain-tracker --version-label v0.0.1",
+    "auth": "graph auth",
     "deploy": "./deploy.sh"
   },
   "dependencies": {

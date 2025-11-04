@@ -9,7 +9,7 @@ dataSources:
     network: sepolia # Network para testnet
     source:
       # ACTUALIZAR con la dirección del contrato en Sepolia
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0xc9f05d6d9752c858c59e31c7d96799261d8841fe"
       abi: SupplyChain
       # ACTUALIZAR con el bloque donde se desplegó el contrato
       startBlock: 0
