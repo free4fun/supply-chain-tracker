@@ -24,28 +24,55 @@ NC='\033[0m' # No Color
 # Step 1: Verificar que tenemos los requisitos
 echo -e "${YELLOW}📋 Verificando requisitos...${NC}"
 
-if [ ! -f "$SC_DIR/.env" ]; then
-    echo -e "${RED}❌ No se encontró sc/.env${NC}"
-    echo "Crea el archivo con:"
-    echo "  SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"
-    echo "  PRIVATE_KEY=your_private_key"
-    exit 1
+# Verificar si existe .env y cargar solo RPC URL (no private key)
+if [ -f "$SC_DIR/.env" ]; then
+    # Cargar solo variables seguras (no PRIVATE_KEY)
+    export $(grep -v '^#' "$SC_DIR/.env" | grep -v 'PRIVATE_KEY' | xargs)
 fi
 
-# Cargar variables de entorno
-source "$SC_DIR/.env"
-
+# Solicitar RPC URL si no está configurada
 if [ -z "$SEPOLIA_RPC_URL" ]; then
-    echo -e "${RED}❌ SEPOLIA_RPC_URL no está configurado en sc/.env${NC}"
+    echo -e "${YELLOW}🔗 Ingresa tu Sepolia RPC URL:${NC}"
+    echo "   (Ejemplo: https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY)"
+    read -r SEPOLIA_RPC_URL
+    
+    if [ -z "$SEPOLIA_RPC_URL" ]; then
+        echo -e "${RED}❌ RPC URL es requerida${NC}"
+        exit 1
+    fi
+fi
+
+echo -e "${GREEN}✅ RPC URL configurada${NC}"
+echo ""
+
+# Solicitar private key de forma segura (sin mostrarla en pantalla)
+echo -e "${YELLOW}🔐 Ingresa tu private key (no se mostrará en pantalla):${NC}"
+echo "   ⚠️  Debe comenzar con 0x"
+echo "   💡 Exportala de Metamask: Account Details → Show Private Key"
+read -s -r PRIVATE_KEY
+echo "" # Nueva línea después del input oculto
+
+# Validar que la private key tenga formato correcto
+if [[ ! "$PRIVATE_KEY" =~ ^0x[a-fA-F0-9]{64}$ ]]; then
+    echo -e "${RED}❌ Private key inválida. Debe ser 0x seguido de 64 caracteres hexadecimales${NC}"
     exit 1
 fi
 
-if [ -z "$PRIVATE_KEY" ]; then
-    echo -e "${RED}❌ PRIVATE_KEY no está configurado en sc/.env${NC}"
-    exit 1
+echo -e "${GREEN}✅ Private key recibida (no se guardará en ningún archivo)${NC}"
+echo ""
+
+# Solicitar confirmación antes de continuar
+echo -e "${YELLOW}⚠️  Estás a punto de desplegar a Sepolia Testnet${NC}"
+echo "   • RPC: $SEPOLIA_RPC_URL"
+echo "   • Esto consumirá ETH de Sepolia"
+echo ""
+read -p "¿Continuar? (yes/no): " -r CONFIRM
+
+if [ "$CONFIRM" != "yes" ]; then
+    echo -e "${YELLOW}Deployment cancelado${NC}"
+    exit 0
 fi
 
-echo -e "${GREEN}✅ Requisitos OK${NC}"
 echo ""
 
 # Step 2: Compilar contrato

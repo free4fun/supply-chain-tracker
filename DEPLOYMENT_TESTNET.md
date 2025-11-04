@@ -55,17 +55,15 @@ Crea el archivo `sc/.env`:
 
 ```bash
 cd sc
+cp .env.example .env
 nano .env
 ```
 
-Agrega:
+Agrega **SOLO** estas variables (NO incluyas PRIVATE_KEY):
 
 ```bash
 # Sepolia RPC URL (Alchemy o Infura)
 SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
-
-# Tu private key (CON el prefijo 0x)
-PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
 
 # Admin address (tu wallet address)
 ADMIN_ADDRESS=0xYOUR_WALLET_ADDRESS
@@ -74,7 +72,80 @@ ADMIN_ADDRESS=0xYOUR_WALLET_ADDRESS
 ETHERSCAN_API_KEY=YOUR_ETHERSCAN_API_KEY
 ```
 
-**Obtener Etherscan API Key (opcional pero recomendado):**
+### 1.2 🔐 Configurar Private Key de Forma Segura
+
+Tienes **3 opciones** (de más segura a menos segura):
+
+#### **Opción A: Foundry Keystore (MÁS SEGURA) ⭐ Recomendado**
+
+Tu private key se guarda **cifrada** con una contraseña:
+
+```bash
+# Ejecutar el setup una sola vez
+./scripts/setup_keystore.sh
+
+# Seguir las instrucciones:
+# 1. Nombrar tu wallet (ej: "sepolia-deployer")
+# 2. Ingresar tu private key (una sola vez)
+# 3. Elegir contraseña para cifrarla
+```
+
+**Beneficios:**
+- ✅ Private key **nunca** en texto plano
+- ✅ Cifrada con contraseña AES-256
+- ✅ Estándar de la industria (Foundry)
+- ✅ Soporte multi-wallet (dev, testnet, mainnet)
+- ✅ No necesitas archivos .env con keys
+
+**Desplegar usando keystore:**
+```bash
+# Si el script fue auto-generado
+./scripts/deploy_sepolia_keystore.sh
+
+# O manualmente
+forge script script/Deploy.s.sol \
+  --rpc-url $SEPOLIA_RPC_URL \
+  --account sepolia-deployer \
+  --sender 0xYOUR_ADDRESS \
+  --broadcast
+```
+
+#### **Opción B: Input Seguro en Terminal (SEGURA)**
+
+El script te pedirá tu private key de forma segura (no se muestra en pantalla):
+
+```bash
+./scripts/deploy_sepolia.sh
+
+# Te pedirá:
+# 🔐 Ingresa tu private key (no se mostrará en pantalla):
+# [ingresar key sin que se vea]
+```
+
+**Beneficios:**
+- ✅ No se guarda en archivos
+- ✅ No queda en historial de bash (input oculto)
+- ✅ Se solicita solo cuando despliegas
+
+#### **Opción C: Variable de Entorno Temporal (MENOS SEGURA)**
+
+Solo para testing rápido en entorno local seguro:
+
+```bash
+# Exportar solo por esta sesión (no se guarda)
+export PRIVATE_KEY=0xYOUR_PRIVATE_KEY
+
+# Desplegar
+cd sc
+forge script script/Deploy.s.sol \
+  --rpc-url $SEPOLIA_RPC_URL \
+  --private-key $PRIVATE_KEY \
+  --broadcast
+```
+
+⚠️ **NO RECOMENDADO** porque queda en historial de bash.
+
+### 1.3 Obtener Etherscan API Key (opcional pero recomendado)
 1. Ve a https://etherscan.io/
 2. Crea cuenta
 3. My Account → API Keys → Add
