@@ -4,6 +4,10 @@ Supply Chain Tracker is a full-stack reference platform for following goods acro
 ## Presentacion Video
 [https://drive.google.com/file/d/1xzv5htO7bDXrXigp_b0uRBEV5LJjJ4q9/view?usp=sharing](https://drive.google.com/file/d/1xzv5htO7bDXrXigp_b0uRBEV5LJjJ4q9/view?usp=sharing)
 
+
+## Contract address deployed in Sepolia
+[https://sepolia.etherscan.io/address/0xc9f05d6d9752c858c59e31c7d96799261d8841fe](https://sepolia.etherscan.io/address/0xc9f05d6d9752c858c59e31c7d96799261d8841fe)
+
 ## Repository layout
 
 | Path | Description |
