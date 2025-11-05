@@ -11,7 +11,8 @@ Supply Chain Tracker is a production-ready platform for tracking goods across ev
 ## 🌐 Live Deployment (Sepolia Testnet)
 
 **Smart Contract**: [0xc9f05d6d9752c858c59e31c7d96799261d8841fe](https://sepolia.etherscan.io/address/0xc9f05d6d9752c858c59e31c7d96799261d8841fe)
-**Frontend**: https://wineproof.vercel.app/
+
+**Frontend**: [https://wineproof.vercel.app/](https://wineproof.vercel.app/)
 
 **Features**:
 - ✅ Role-based access control (Admin, Producer, Distributor, Retailer)
